@@ -381,9 +381,13 @@ impl TryFrom<ApiResponse> for MessagesResponse {
 }
 
 /// Deserializes an Anthropic API response from JSON.
-pub fn deserialize_response(json: &str) -> Result<MessagesResponse, Error> {
+pub fn deserialize_response<T>(json: &str) -> Result<T, Error>
+where
+    T: TryFrom<ApiResponse>,
+    Error: From<T::Error>,
+{
     let helper: ApiResponse = serde_json::from_str(json)?;
-    let response = MessagesResponse::try_from(helper)?;
+    let response = T::try_from(helper)?;
     Ok(response)
 }
 
@@ -574,7 +578,7 @@ mod tests {
   }
 }"#;
 
-        let result = deserialize_response(json);
+        let result: Result<super::MessagesResponse, _> = deserialize_response(json);
 
         assert!(result.is_err());
         if let Err(super::Error::Api(api_error)) = result {
@@ -594,7 +598,7 @@ mod tests {
   "type": "error"
 }"#;
 
-        let result = deserialize_response(json);
+        let result: Result<super::MessagesResponse, _> = deserialize_response(json);
 
         assert!(result.is_err());
         if let Err(super::Error::Api(api_error)) = result {
@@ -625,7 +629,7 @@ mod tests {
   }
 }"#;
 
-        let response = deserialize_response(json).expect("should deserialize API message response");
+        let response: super::MessagesResponse = deserialize_response(json).expect("should deserialize API message response");
 
         assert_eq!(response.id, "msg_013Zva2CMHLNnXjNJJKqJ2EF");
         assert_eq!(response.model, "claude-3-7-sonnet-20250219");
