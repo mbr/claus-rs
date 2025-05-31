@@ -444,6 +444,7 @@ impl From<HttpRequest> for reqwest::blocking::Request {
 
 #[cfg(test)]
 mod tests {
+    use super::{ApiError, ApiResponse};
 
     #[cfg(feature = "reqwest")]
     #[test]
@@ -527,5 +528,47 @@ mod tests {
         let body_str = std::str::from_utf8(body_bytes).unwrap();
         assert!(body_str.contains("Hello, world!"));
         assert!(body_str.contains("\"type\":\"text\""));
+    }
+
+    #[test]
+    fn test_api_response_error_deserialization() {
+        let json = r#"{
+  "type": "error",
+  "error": {
+    "type": "not_found_error",
+    "message": "The requested resource could not be found."
+  }
+}"#;
+
+        let response: ApiResponse =
+            serde_json::from_str(json).expect("should deserialize API error response");
+
+        assert!(matches!(
+            response,
+            ApiResponse::Error {
+                error: ApiError::NotFoundError
+            }
+        ));
+    }
+
+    #[test]
+    fn test_api_response_invalid_request_deserialization() {
+        let json = r#"{
+  "error": {
+    "message": "Invalid request",
+    "type": "invalid_request_error"
+  },
+  "type": "error"
+}"#;
+
+        let response: ApiResponse =
+            serde_json::from_str(json).expect("should deserialize API error response");
+
+        assert!(matches!(
+            response,
+            ApiResponse::Error {
+                error: ApiError::InvalidRequestError
+            }
+        ));
     }
 }
