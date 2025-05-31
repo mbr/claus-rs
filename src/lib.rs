@@ -42,8 +42,8 @@ use serde_json;
 /// API version that is compatible with this module.
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
 
-/// Default API endpoint to use.
-pub const DEFAULT_ENDPOINT: &str = "https://api.anthropic.com/v1";
+/// Default API endpoint host to use.
+pub const DEFAULT_ENDPOINT_HOST: &str = "api.anthropic.com";
 
 /// Default model to use for requests.
 pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
@@ -57,8 +57,8 @@ pub struct Api {
     default_model: Arc<str>,
     /// The default maximum number of tokens for responses.
     default_max_tokens: u32,
-    /// The API endpoint without a trailing slash.
-    endpoint: Arc<str>,
+    /// The API endpoint host (without protocol or path).
+    endpoint_host: Arc<str>,
 }
 
 impl Api {
@@ -70,7 +70,7 @@ impl Api {
             api_key: api_key.into(),
             default_model: Arc::from(DEFAULT_MODEL),
             default_max_tokens: 1024,
-            endpoint: Arc::from(DEFAULT_ENDPOINT),
+            endpoint_host: Arc::from(DEFAULT_ENDPOINT_HOST),
         }
     }
 
@@ -90,11 +90,11 @@ impl Api {
         self
     }
 
-    /// Sets the API endpoint.
+    /// Sets the API endpoint host.
     ///
-    /// If not set, [`DEFAULT_ENDPOINT`] will be used.
-    pub fn endpoint<S: Into<Arc<str>>>(mut self, endpoint: S) -> Self {
-        self.endpoint = endpoint.into();
+    /// If not set, [`DEFAULT_ENDPOINT_HOST`] will be used.
+    pub fn endpoint_host<S: Into<Arc<str>>>(mut self, endpoint_host: S) -> Self {
+        self.endpoint_host = endpoint_host.into();
         self
     }
 
@@ -113,8 +113,10 @@ impl Api {
 /// This type represents an HTTP request that can be sent to the Anthropic API.
 #[derive(Debug)]
 pub struct HttpRequest {
-    /// Request URL.
-    pub url: Arc<str>,
+    /// Request host.
+    pub host: String,
+    /// Request path.
+    pub path: String,
     /// HTTP method.
     pub method: &'static str,
     /// Request headers.
@@ -130,6 +132,29 @@ impl HttpRequest {
             .map(|(k, v)| format!("{}: {}", k, v.as_ref()))
             .collect::<Vec<_>>()
             .join("\n")
+    }
+}
+
+impl std::fmt::Display for HttpRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Write request line
+        writeln!(f, "{} {} HTTP/1.1", self.method, self.path)?;
+        
+        // Write Host header first
+        writeln!(f, "Host: {}", self.host)?;
+
+        // Write other headers
+        for (key, value) in &self.headers {
+            writeln!(f, "{}: {}", key, value.as_ref())?;
+        }
+
+        // Empty line between headers and body
+        writeln!(f)?;
+
+        // Write body
+        write!(f, "{}", self.body)?;
+
+        Ok(())
     }
 }
 
@@ -230,7 +255,8 @@ impl MessagesRequestBuilder {
         let body = serde_json::to_string(&body).expect("failed to serialize messages");
 
         HttpRequest {
-            url: Arc::from("https://api.anthropic.com/v1/messages"),
+            host: api.endpoint_host.to_string(),
+            path: "/v1/messages".to_string(),
             method: "POST",
             headers,
             body,
@@ -298,7 +324,8 @@ impl HttpRequest {
     pub fn try_into_reqwest(self) -> Result<reqwest::Request, Box<dyn std::error::Error>> {
         let method = reqwest::Method::from_bytes(self.method.as_bytes())?;
 
-        let url = reqwest::Url::parse(&self.url)?;
+        let url_string = format!("https://{}{}", self.host, self.path);
+        let url = reqwest::Url::parse(&url_string)?;
         let mut request = reqwest::Request::new(method, url);
 
         // Set body
@@ -322,7 +349,8 @@ impl HttpRequest {
     pub fn try_into_reqwest_blocking(self) -> Result<reqwest::blocking::Request, Box<dyn std::error::Error>> {
         let method = reqwest::Method::from_bytes(self.method.as_bytes())?;
 
-        let url = reqwest::Url::parse(&self.url)?;
+        let url_string = format!("https://{}{}", self.host, self.path);
+        let url = reqwest::Url::parse(&url_string)?;
         let mut request = reqwest::blocking::Request::new(method, url);
 
         // Set body
@@ -364,7 +392,8 @@ mod tests {
     #[test]
     fn test_http_request_to_reqwest_conversion() {
         let http_request = HttpRequest {
-            url: Arc::from("https://api.anthropic.com/v1/messages"),
+            host: "api.anthropic.com".to_string(),
+            path: "/v1/messages".to_string(),
             method: "POST",
             headers: vec![
                 ("content-type", Arc::from("application/json")),
@@ -405,7 +434,8 @@ mod tests {
     #[test]
     fn test_http_request_to_reqwest_blocking_conversion() {
         let http_request = HttpRequest {
-            url: Arc::from("https://api.anthropic.com/v1/messages"),
+            host: "api.anthropic.com".to_string(),
+            path: "/v1/messages".to_string(),
             method: "POST",
             headers: vec![
                 ("content-type", Arc::from("application/json")),
