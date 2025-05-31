@@ -1,6 +1,6 @@
 use std::{env, fs, io, mem, sync::Arc};
 
-use klaus::{Message, MessagesResponse, Role, deserialize_response};
+use klaus::anthropic::{Message, MessagesResponse, Role, deserialize_response};
 
 fn main() {
     let key_file = env::args()
