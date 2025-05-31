@@ -185,10 +185,12 @@ pub struct MessagesRequestBuilder {
     ///
     /// If none is provided, the default max tokens will be used.
     max_tokens: Option<u32>,
+    /// The system prompt for the conversation.
+    system: Option<String>,
     /// The messages to send.
     messages: Vec<Arc<Message>>,
     // Note: Missing: container, mcp_servers, metadata, service_tier,
-    //                stop_sequences, stream, system, temperature, thinking,
+    //                stop_sequences, stream, temperature, thinking,
     //                tool_choice, tools, top_k, top_p
 }
 
@@ -216,6 +218,7 @@ impl MessagesRequestBuilder {
         Self {
             model: None,
             max_tokens: None,
+            system: None,
             messages: Vec::new(),
         }
     }
@@ -229,6 +232,12 @@ impl MessagesRequestBuilder {
     /// Sets the maximum tokens for the request.
     pub fn max_tokens(mut self, max_tokens: u32) -> Self {
         self.max_tokens = Some(max_tokens);
+        self
+    }
+
+    /// Sets the system prompt for the request.
+    pub fn system<S: Into<String>>(mut self, system: S) -> Self {
+        self.system = Some(system.into());
         self
     }
 
@@ -273,9 +282,12 @@ impl MessagesRequestBuilder {
                 &api.default_model
             };
 
+            let system = self.system.as_deref();
+
             let body = MessagesBody {
                 model,
                 max_tokens: self.max_tokens.unwrap_or(api.default_max_tokens),
+                system,
                 messages: &self.messages,
             };
 
@@ -546,5 +558,29 @@ mod tests {
             panic!("should be text");
         };
         assert_eq!(text, "Hi! My name is Claude.");
+    }
+
+    #[test]
+    fn test_messages_request_builder_with_system_prompt() {
+        let api = super::Api::new("test-api-key");
+
+        let http_request = super::MessagesRequestBuilder::new()
+            .system("You are a helpful assistant.")
+            .push_message(Role::User, "Hello!")
+            .build(&api);
+
+        assert_eq!(http_request.method, "POST");
+        assert_eq!(http_request.path, "/v1/messages");
+        assert_eq!(http_request.host, "api.anthropic.com");
+
+        // Verify the body contains the system prompt
+        assert!(
+            http_request
+                .body
+                .contains("\"system\":\"You are a helpful assistant.\"")
+        );
+        assert!(http_request.body.contains("\"messages\":["));
+        assert!(http_request.body.contains("\"role\":\"user\""));
+        assert!(http_request.body.contains("\"text\":\"Hello!\""));
     }
 }

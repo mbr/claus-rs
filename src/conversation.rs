@@ -11,6 +11,7 @@ use crate::{
 #[derive(Debug)]
 pub struct Conversation {
     api: Api,
+    system: Option<String>,
     messages: Vec<Arc<Message>>,
 }
 
@@ -19,8 +20,15 @@ impl Conversation {
     pub fn new(api: Api) -> Self {
         Self {
             api,
+            system: None,
             messages: Vec::new(),
         }
+    }
+
+    /// Sets the system prompt for the conversation.
+    pub fn set_system<S: Into<String>>(&mut self, system: S) -> &mut Self {
+        self.system = Some(system.into());
+        self
     }
 
     /// Adds a user message and returns an HTTP request to send.
@@ -30,9 +38,13 @@ impl Conversation {
         self.messages.push(Arc::new(message));
 
         // Build and return HTTP request with full conversation history
-        MessagesRequestBuilder::new()
-            .set_messages(self.messages.clone())
-            .build(&self.api)
+        let mut builder = MessagesRequestBuilder::new().set_messages(self.messages.clone());
+
+        if let Some(ref system) = self.system {
+            builder = builder.system(system.clone());
+        }
+
+        builder.build(&self.api)
     }
 
     /// Handles the response from the API and returns the assistant's message content.

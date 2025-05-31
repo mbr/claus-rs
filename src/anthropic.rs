@@ -21,6 +21,8 @@ pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 pub struct MessagesBody<'a> {
     pub model: &'a str,
     pub max_tokens: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system: Option<&'a str>,
     #[serde(serialize_with = "serialize_arc_vec")]
     pub messages: &'a Vec<Arc<Message>>,
 }
