@@ -5,8 +5,6 @@ pub mod conversation;
 
 use std::{fmt, sync::Arc};
 
-use anthropic::MessagesBody;
-
 /// An Anthropic API configuration.
 #[derive(Debug)]
 pub struct Api {
@@ -23,7 +21,8 @@ pub struct Api {
 impl Api {
     /// Creates a new Anthropic API instance.
     ///
-    /// Requires a valid Anthropic API key.
+    /// Requires a valid Anthropic API key. If you do not have one, you can get one from
+    /// [Anthropic's console](https://console.anthropic.com/settings/keys).
     pub fn new<S: Into<Arc<str>>>(api_key: S) -> Self {
         Self {
             api_key: api_key.into(),
@@ -43,6 +42,9 @@ impl Api {
 
     /// Sets the default maximum tokens for responses.
     ///
+    /// Responses will be cut off at this number of tokens, but may end earlier if the model
+    /// decides to do so.
+    ///
     /// If not set, the default is 1024.
     pub fn default_max_tokens(mut self, max_tokens: u32) -> Self {
         self.default_max_tokens = max_tokens;
@@ -50,6 +52,8 @@ impl Api {
     }
 
     /// Sets the API endpoint host.
+    ///
+    /// This can only be a hostname, not a full URL.
     ///
     /// If not set, [`anthropic::DEFAULT_ENDPOINT_HOST`] will be used.
     pub fn endpoint_host<S: Into<Arc<str>>>(mut self, endpoint_host: S) -> Self {
@@ -229,7 +233,7 @@ impl MessagesRequestBuilder {
 
             let system = self.system.as_deref();
 
-            let body = MessagesBody {
+            let body = anthropic::MessagesBody {
                 model,
                 max_tokens: self.max_tokens.unwrap_or(api.default_max_tokens),
                 system,
