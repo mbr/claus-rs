@@ -36,7 +36,7 @@
 //! // now the request can be sent with any HTTP client
 //! ```
 
-mod anthropic;
+pub mod anthropic;
 
 use std::{fmt, sync::Arc};
 
