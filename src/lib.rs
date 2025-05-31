@@ -36,10 +36,9 @@
 //! // now the request can be sent with any HTTP client
 //! ```
 
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 /// API version that is compatible with this module.
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -195,6 +194,12 @@ where
         seq.serialize_element(&**message)?;
     }
     seq.end()
+}
+
+impl Default for MessagesRequestBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MessagesRequestBuilder {
@@ -404,9 +409,6 @@ impl From<HttpRequest> for reqwest::blocking::Request {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use super::HttpRequest;
 
     #[cfg(feature = "reqwest")]
     #[test]
