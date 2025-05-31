@@ -26,3 +26,4 @@ thiserror.workspace = true
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["blocking"] }
+rustyline = "14.0"
