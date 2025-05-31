@@ -331,7 +331,7 @@ enum Content {
 }
 
 /// Anthropic API error.
-#[derive(Debug, thiserror::Error, Deserialize, Serialize)]
+#[derive(Clone, Debug, thiserror::Error, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ApiError {
     /// HTTP 400, invalid request
@@ -370,12 +370,12 @@ pub enum ApiResponse {
 }
 
 impl TryFrom<ApiResponse> for MessagesResponse {
-    type Error = ApiError;
+    type Error = ();
 
     fn try_from(helper: ApiResponse) -> Result<Self, Self::Error> {
         match helper {
             ApiResponse::Message(response) => Ok(response),
-            ApiResponse::Error { error } => Err(error),
+            ApiResponse::Error { error: _ } => Err(()),
         }
     }
 }
@@ -384,11 +384,19 @@ impl TryFrom<ApiResponse> for MessagesResponse {
 pub fn deserialize_response<T>(json: &str) -> Result<T, Error>
 where
     T: TryFrom<ApiResponse>,
-    Error: From<T::Error>,
 {
-    let helper: ApiResponse = serde_json::from_str(json)?;
-    let response = T::try_from(helper)?;
-    Ok(response)
+    let api_response: ApiResponse = serde_json::from_str(json)?;
+
+    // Handle API errors explicitly
+    if let ApiResponse::Error { error } = &api_response {
+        return Err(Error::Api(error.clone()));
+    }
+
+    // Try conversion, handle failure case
+    match T::try_from(api_response) {
+        Ok(response) => Ok(response),
+        Err(_) => Err(Error::UnexpectedResponseType),
+    }
 }
 
 /// An Anthropic API error.
@@ -398,8 +406,8 @@ pub enum Error {
     Serde(#[from] serde_json::Error),
     #[error("API error: {0}")]
     Api(#[from] ApiError),
-    #[error(transparent)]
-    Other(Box<dyn ::core::error::Error + Send>),
+    #[error("Unexpected response type")]
+    UnexpectedResponseType,
 }
 
 // Below are features that may be feature-gated later.
@@ -629,7 +637,8 @@ mod tests {
   }
 }"#;
 
-        let response: super::MessagesResponse = deserialize_response(json).expect("should deserialize API message response");
+        let response: super::MessagesResponse =
+            deserialize_response(json).expect("should deserialize API message response");
 
         assert_eq!(response.id, "msg_013Zva2CMHLNnXjNJJKqJ2EF");
         assert_eq!(response.model, "claude-3-7-sonnet-20250219");
