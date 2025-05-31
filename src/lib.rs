@@ -308,11 +308,11 @@ impl<'de> serde::Deserialize<'de> for Role {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = <&str>::deserialize(deserializer)?;
-        match s {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
             "user" => Ok(Role::User),
             "assistant" => Ok(Role::Assistant),
-            _ => Ok(Role::Other(s.to_string())),
+            _ => Ok(Role::Other(s)),
         }
     }
 }
