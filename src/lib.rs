@@ -14,7 +14,9 @@
 //!     .push_message(Role::User, "Hello, world!")
 //!     .build(&api);
 //!
-//! assert_eq!(http_request.url.as_ref(), "https://api.anthropic.com/v1/messages");
+//! assert_eq!(http_request.host, "api.anthropic.com");
+//! assert_eq!(http_request.path, "/v1/messages");
+
 //! assert_eq!(http_request.method, "POST");
 //!
 //! assert_eq!(
@@ -28,7 +30,7 @@
 //!
 //! assert_eq!(
 //!     &http_request.body,
-//!     r#"{"messages":[{"role":"user","content":{"type":"text","text":"Hello, world!"}}]}"#
+//!     r#"{"model":"claude-sonnet-4-20250514","max_tokens":1024,"messages":[{"role":"user","content":[{"type":"text","text":"Hello, world!"}]}]}"#
 //! );
 //!
 //! // now the request can be sent with any HTTP client
