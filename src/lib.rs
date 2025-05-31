@@ -354,6 +354,7 @@ enum ApiError {
     RateLimitError,
     /// HTTP 500, an unexpected error has occurred internal to Anthropic's systems
     #[error("API error")]
+    #[allow(clippy::enum_variant_names)]
     ApiError,
     /// HTTP 529, Anthropic's API is temporarily overloaded
     #[error("API overloaded")]
