@@ -1,96 +1,40 @@
-use std::{env, fs};
+use std::{env, fs, io};
 
-use rustyline::{
-    Config, EditMode, Editor,
-    error::ReadlineError,
-    history::DefaultHistory,
-    validate::{ValidationContext, ValidationResult, Validator},
+use reedline::{
+    DefaultCompleter, DefaultHinter, DefaultValidator, EditCommand, Emacs, KeyCode, KeyModifiers,
+    Prompt, PromptEditMode, PromptHistorySearch, Reedline, ReedlineEvent, Signal,
+    default_emacs_keybindings,
 };
 
-// Helper struct for multi-line editing that detects when input seems incomplete
-#[derive(Default)]
-struct MultilineValidator;
+// Custom prompt that shows "You: " for single line and "   | " for continuation
+struct ChatPrompt;
 
-impl Validator for MultilineValidator {
-    fn validate(&self, ctx: &mut ValidationContext) -> rustyline::Result<ValidationResult> {
-        let input = ctx.input().trim();
+impl Prompt for ChatPrompt {
+    fn render_prompt_left(&self) -> std::borrow::Cow<str> {
+        "You: ".into()
+    }
 
-        // If input ends with a backslash, continue to next line
-        if input.ends_with('\\') {
-            return Ok(ValidationResult::Incomplete);
-        }
+    fn render_prompt_right(&self) -> std::borrow::Cow<str> {
+        "".into()
+    }
 
-        // If input has unmatched opening brackets/quotes, continue to next line
-        let mut paren_count = 0;
-        let mut bracket_count = 0;
-        let mut brace_count = 0;
-        let mut in_single_quote = false;
-        let mut in_double_quote = false;
-        let mut escape_next = false;
+    fn render_prompt_indicator(&self, _edit_mode: PromptEditMode) -> std::borrow::Cow<str> {
+        "".into()
+    }
 
-        for ch in input.chars() {
-            if escape_next {
-                escape_next = false;
-                continue;
-            }
+    fn render_prompt_multiline_indicator(&self) -> std::borrow::Cow<str> {
+        "   | ".into()
+    }
 
-            match ch {
-                '\\' => escape_next = true,
-                '\'' if !in_double_quote => in_single_quote = !in_single_quote,
-                '"' if !in_single_quote => in_double_quote = !in_double_quote,
-                '(' if !in_single_quote && !in_double_quote => paren_count += 1,
-                ')' if !in_single_quote && !in_double_quote => paren_count -= 1,
-                '[' if !in_single_quote && !in_double_quote => bracket_count += 1,
-                ']' if !in_single_quote && !in_double_quote => bracket_count -= 1,
-                '{' if !in_single_quote && !in_double_quote => brace_count += 1,
-                '}' if !in_single_quote && !in_double_quote => brace_count -= 1,
-                _ => {}
-            }
-        }
-
-        // Continue input if quotes are unmatched or brackets are unmatched
-        if in_single_quote
-            || in_double_quote
-            || paren_count > 0
-            || bracket_count > 0
-            || brace_count > 0
-        {
-            return Ok(ValidationResult::Incomplete);
-        }
-
-        Ok(ValidationResult::Valid(None))
+    fn render_prompt_history_search_indicator(
+        &self,
+        _history_search: PromptHistorySearch,
+    ) -> std::borrow::Cow<str> {
+        "".into()
     }
 }
 
-// Custom helper that combines all the traits we need
-struct ChatHelper {
-    validator: MultilineValidator,
-}
-
-impl Default for ChatHelper {
-    fn default() -> Self {
-        ChatHelper {
-            validator: MultilineValidator::default(),
-        }
-    }
-}
-
-impl rustyline::Helper for ChatHelper {}
-impl rustyline::completion::Completer for ChatHelper {
-    type Candidate = String;
-}
-impl rustyline::hint::Hinter for ChatHelper {
-    type Hint = String;
-}
-impl rustyline::highlight::Highlighter for ChatHelper {}
-
-impl Validator for ChatHelper {
-    fn validate(&self, ctx: &mut ValidationContext) -> rustyline::Result<ValidationResult> {
-        self.validator.validate(ctx)
-    }
-}
-
-fn main() -> rustyline::Result<()> {
+fn main() -> io::Result<()> {
     let key_file = env::args()
         .skip(1)
         .next()
@@ -104,44 +48,47 @@ fn main() -> rustyline::Result<()> {
     // Create a conversation instance
     let mut conversation = klaus::Conversation::new(api);
 
-    // Configure rustyline for multiline editing
-    let config = Config::builder().edit_mode(EditMode::Emacs).build();
+    // Set up reedline with custom keybindings for Shift+Enter
+    let mut keybindings = default_emacs_keybindings();
 
-    let mut rl: Editor<ChatHelper, DefaultHistory> = Editor::with_config(config)?;
-    rl.set_helper(Some(ChatHelper::default()));
+    // Shift+Enter should insert a newline (multiline mode)
+    keybindings.add_binding(
+        KeyModifiers::SHIFT,
+        KeyCode::Enter,
+        ReedlineEvent::Edit(vec![EditCommand::InsertNewline]),
+    );
+
+    // Regular Enter should submit
+    keybindings.add_binding(KeyModifiers::NONE, KeyCode::Enter, ReedlineEvent::Enter);
+
+    let edit_mode = Box::new(Emacs::new(keybindings));
+
+    let mut line_editor = Reedline::create()
+        .with_edit_mode(edit_mode)
+        .with_validator(Box::new(DefaultValidator))
+        .with_completer(Box::new(DefaultCompleter::default()))
+        .with_hinter(Box::new(DefaultHinter::default()));
+
+    let prompt = ChatPrompt;
 
     println!("Chat with Claude! Features:");
     println!("- Type your message and press Enter to send");
-    println!("- For multiline input:");
-    println!("  * End lines with \\ to continue on next line");
-    println!("  * Unmatched quotes or brackets will continue automatically");
-    println!("  * Use standard editing commands like Ctrl+A, Ctrl+E, etc.");
+    println!("- Press Shift+Enter to add newlines within your message");
+    println!("- Use standard editing commands (Ctrl+A, Ctrl+E, etc.)");
     println!("- Use Ctrl+C to exit");
     println!();
 
     loop {
-        // Use readline for multiline support
-        let readline = rl.readline("You: ");
+        let sig = line_editor.read_line(&prompt);
 
-        match readline {
-            Ok(mut line) => {
-                // Remove trailing backslashes used for line continuation
-                while line.ends_with('\\') {
-                    line.pop();
-                    if line.ends_with(' ') {
-                        line.push(' ');
-                    }
-                }
-
-                let user_message = line.trim();
+        match sig {
+            Ok(Signal::Success(buffer)) => {
+                let user_message = buffer.trim();
 
                 // Skip empty messages
                 if user_message.is_empty() {
                     continue;
                 }
-
-                // Add to history for up/down arrow navigation
-                let _ = rl.add_history_entry(&line);
 
                 // Generate HTTP request with the conversation abstraction
                 let http_req = conversation.chat_message(user_message);
@@ -173,16 +120,16 @@ fn main() -> rustyline::Result<()> {
                 println!("Messages in conversation: {}", conversation.message_count());
                 println!();
             }
-            Err(ReadlineError::Interrupted) => {
+            Ok(Signal::CtrlC) => {
                 println!("Goodbye!");
                 break;
             }
-            Err(ReadlineError::Eof) => {
+            Ok(Signal::CtrlD) => {
                 println!("Goodbye!");
                 break;
             }
             Err(err) => {
-                println!("Error: {:?}", err);
+                eprintln!("Error: {}", err);
                 break;
             }
         }
