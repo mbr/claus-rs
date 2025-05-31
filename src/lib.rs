@@ -333,7 +333,7 @@ enum Content {
 /// Anthropic API error.
 #[derive(Debug, thiserror::Error, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum ApiError {
+pub enum ApiError {
     /// HTTP 400, invalid request
     #[error("Invalid request")]
     InvalidRequestError,
@@ -362,47 +362,29 @@ enum ApiError {
 }
 
 /// A response from the Anthropic API.
-#[derive(Debug)]
-struct ApiResponseHelper(Result<ApiResponse, ApiError>);
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ApiResponse {
+    Message(MessagesResponse),
+    Error { error: ApiError },
+}
 
-impl<'de> serde::Deserialize<'de> for ApiResponseHelper {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde_json::Value;
+impl TryFrom<ApiResponse> for MessagesResponse {
+    type Error = ApiError;
 
-        let value: Value = Value::deserialize(deserializer)?;
-
-        // Check the "type" field to determine how to deserialize
-        if let Some(type_field) = value.get("type") {
-            if type_field == "error" {
-                // It's an error response, extract the error field
-                if let Some(error_value) = value.get("error") {
-                    let api_error: ApiError =
-                        ApiError::deserialize(error_value).map_err(serde::de::Error::custom)?;
-                    Ok(ApiResponseHelper(Err(api_error)))
-                } else {
-                    Err(serde::de::Error::missing_field("error"))
-                }
-            } else if type_field == "message" {
-                // It's a successful response
-                let response: ApiResponse =
-                    ApiResponse::deserialize(value).map_err(serde::de::Error::custom)?;
-                Ok(ApiResponseHelper(Ok(response)))
-            } else {
-                Err(serde::de::Error::custom("Unknown response type"))
-            }
-        } else {
-            Err(serde::de::Error::missing_field("type"))
+    fn try_from(helper: ApiResponse) -> Result<Self, Self::Error> {
+        match helper {
+            ApiResponse::Message(response) => Ok(response),
+            ApiResponse::Error { error } => Err(error),
         }
     }
 }
 
 /// Deserializes an Anthropic API response from JSON.
-pub fn deserialize_response(json: &str) -> Result<ApiResponse, Error> {
-    let helper: ApiResponseHelper = serde_json::from_str(json)?;
-    helper.0.map_err(Error::Api)
+pub fn deserialize_response(json: &str) -> Result<MessagesResponse, Error> {
+    let helper: ApiResponse = serde_json::from_str(json)?;
+    let response = MessagesResponse::try_from(helper)?;
+    Ok(response)
 }
 
 /// An Anthropic API error.
@@ -660,7 +642,7 @@ mod tests {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ApiResponse {
+pub struct MessagesResponse {
     content: Vec<Content>,
     id: String,
     model: String,
