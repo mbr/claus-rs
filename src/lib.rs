@@ -325,9 +325,18 @@ pub struct Message {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum Content {
+pub enum Content {
     Text { text: String },
-    // not supported: Image
+    Image,
+}
+
+impl Content {
+    pub fn as_text(&self) -> Option<&str> {
+        if let Content::Text { text } = self {
+            return Some(text.as_str());
+        }
+        None
+    }
 }
 
 /// Anthropic API error.
@@ -663,6 +672,24 @@ pub struct MessagesResponse {
     stop_reason: String,
     stop_sequence: Option<String>,
     usage: Usage,
+}
+
+impl IntoIterator for MessagesResponse {
+    type Item = Content;
+    type IntoIter = std::vec::IntoIter<Content>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.content.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a MessagesResponse {
+    type Item = &'a Content;
+    type IntoIter = std::slice::Iter<'a, Content>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.content.iter()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

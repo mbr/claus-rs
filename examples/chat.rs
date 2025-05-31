@@ -1,6 +1,6 @@
 use std::{env, fs};
 
-use klaus::{Role, deserialize_response, MessagesResponse};
+use klaus::{MessagesResponse, Role, deserialize_response};
 
 fn main() {
     let key_file = env::args()
@@ -26,5 +26,11 @@ fn main() {
         .expect("failed to fetch contents");
 
     let response: MessagesResponse = deserialize_response(&raw).expect("failed to parse response");
-    println!("{:?}", response);
+    for content in &response {
+        let Some(text) = content.as_text() else {
+            continue;
+        };
+    println!("{}", text);
+
+    }
 }
