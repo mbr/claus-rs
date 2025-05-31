@@ -361,28 +361,61 @@ enum ApiError {
     OverloadedError,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum ApiResponse {
-    Error { error: ApiError },
-    Message(MessagesResponse),
+/// A response from the Anthropic API.
+#[derive(Debug)]
+struct ApiResponseHelper(Result<ApiResponse, ApiError>);
+
+impl<'de> serde::Deserialize<'de> for ApiResponseHelper {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde_json::Value;
+
+        let value: Value = Value::deserialize(deserializer)?;
+
+        // Check the "type" field to determine how to deserialize
+        if let Some(type_field) = value.get("type") {
+            if type_field == "error" {
+                // It's an error response, extract the error field
+                if let Some(error_value) = value.get("error") {
+                    let api_error: ApiError =
+                        ApiError::deserialize(error_value).map_err(serde::de::Error::custom)?;
+                    Ok(ApiResponseHelper(Err(api_error)))
+                } else {
+                    Err(serde::de::Error::missing_field("error"))
+                }
+            } else if type_field == "message" {
+                // It's a successful response
+                let response: ApiResponse =
+                    ApiResponse::deserialize(value).map_err(serde::de::Error::custom)?;
+                Ok(ApiResponseHelper(Ok(response)))
+            } else {
+                Err(serde::de::Error::custom("Unknown response type"))
+            }
+        } else {
+            Err(serde::de::Error::missing_field("type"))
+        }
+    }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct MessagesResponse {
-    content: Vec<Content>,
-    id: String,
-    model: String,
-    role: Role,
-    stop_reason: String,
-    stop_sequence: Option<String>,
-    usage: Usage,
+/// Deserializes an Anthropic API response from JSON.
+pub fn deserialize_response(json: &str) -> Result<ApiResponse, Error> {
+    let helper: ApiResponseHelper = serde_json::from_str(json)?;
+    helper.0.map_err(Error::Api)
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Usage {
-    input_tokens: u32,
-    output_tokens: u32,
+/// An Anthropic API error.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Deserialization error: {0}")]
+    Serde(#[from] serde_json::Error),
+    #[error("API error: {0}")]
+    Api(#[from] ApiError),
+}
+
+fn parse_response(raw: &str) -> Result<ApiResponse, Error> {
+    deserialize_response(raw)
 }
 
 // Below are features that may be feature-gated later.
@@ -459,21 +492,24 @@ impl From<HttpRequest> for reqwest::blocking::Request {
 
 #[cfg(test)]
 mod tests {
-    use super::{ApiError, ApiResponse};
+    use super::{ApiError, deserialize_response};
 
     #[cfg(feature = "reqwest")]
     #[test]
     fn test_http_request_to_reqwest_conversion() {
-        let http_request = HttpRequest {
+        let http_request = super::HttpRequest {
             host: "api.anthropic.com".to_string(),
             path: "/v1/messages".to_string(),
             method: "POST",
             headers: vec![
-                ("content-type", Arc::from("application/json")),
-                ("anthropic-version", Arc::from("2023-06-01")),
-                ("x-api-key", Arc::from("test-key")),
-                ("anthropic-model", Arc::from("claude-3-sonnet-20240229")),
-                ("max-tokens", Arc::from("1024")),
+                ("content-type", std::sync::Arc::from("application/json")),
+                ("anthropic-version", std::sync::Arc::from("2023-06-01")),
+                ("x-api-key", std::sync::Arc::from("test-key")),
+                (
+                    "anthropic-model",
+                    std::sync::Arc::from("claude-3-sonnet-20240229"),
+                ),
+                ("max-tokens", std::sync::Arc::from("1024")),
             ],
             body:
                 r#"{"messages":[{"role":"user","content":{"type":"text","text":"Hello, world!"}}]}"#
@@ -506,16 +542,19 @@ mod tests {
     #[cfg(feature = "reqwest-blocking")]
     #[test]
     fn test_http_request_to_reqwest_blocking_conversion() {
-        let http_request = HttpRequest {
+        let http_request = super::HttpRequest {
             host: "api.anthropic.com".to_string(),
             path: "/v1/messages".to_string(),
             method: "POST",
             headers: vec![
-                ("content-type", Arc::from("application/json")),
-                ("anthropic-version", Arc::from("2023-06-01")),
-                ("x-api-key", Arc::from("test-key")),
-                ("anthropic-model", Arc::from("claude-3-sonnet-20240229")),
-                ("max-tokens", Arc::from("1024")),
+                ("content-type", std::sync::Arc::from("application/json")),
+                ("anthropic-version", std::sync::Arc::from("2023-06-01")),
+                ("x-api-key", std::sync::Arc::from("test-key")),
+                (
+                    "anthropic-model",
+                    std::sync::Arc::from("claude-3-sonnet-20240229"),
+                ),
+                ("max-tokens", std::sync::Arc::from("1024")),
             ],
             body:
                 r#"{"messages":[{"role":"user","content":{"type":"text","text":"Hello, world!"}}]}"#
@@ -555,15 +594,14 @@ mod tests {
   }
 }"#;
 
-        let response: ApiResponse =
-            serde_json::from_str(json).expect("should deserialize API error response");
+        let result = deserialize_response(json);
 
-        assert!(matches!(
-            response,
-            ApiResponse::Error {
-                error: ApiError::NotFoundError
-            }
-        ));
+        assert!(result.is_err());
+        if let Err(super::Error::Api(api_error)) = result {
+            assert!(matches!(api_error, ApiError::NotFoundError));
+        } else {
+            panic!("Expected Api error");
+        }
     }
 
     #[test]
@@ -576,15 +614,14 @@ mod tests {
   "type": "error"
 }"#;
 
-        let response: ApiResponse =
-            serde_json::from_str(json).expect("should deserialize API error response");
+        let result = deserialize_response(json);
 
-        assert!(matches!(
-            response,
-            ApiResponse::Error {
-                error: ApiError::InvalidRequestError
-            }
-        ));
+        assert!(result.is_err());
+        if let Err(super::Error::Api(api_error)) = result {
+            assert!(matches!(api_error, ApiError::InvalidRequestError));
+        } else {
+            panic!("Expected Api error");
+        }
     }
 
     #[test]
@@ -608,24 +645,35 @@ mod tests {
   }
 }"#;
 
-        let response: ApiResponse =
-            serde_json::from_str(json).expect("should deserialize API message response");
+        let response = deserialize_response(json).expect("should deserialize API message response");
 
-        assert!(matches!(response, ApiResponse::Message(_)));
+        assert_eq!(response.id, "msg_013Zva2CMHLNnXjNJJKqJ2EF");
+        assert_eq!(response.model, "claude-3-7-sonnet-20250219");
+        assert!(matches!(response.role, super::Role::Assistant));
+        assert_eq!(response.stop_reason, "end_turn");
+        assert_eq!(response.stop_sequence, None);
+        assert_eq!(response.usage.input_tokens, 2095);
+        assert_eq!(response.usage.output_tokens, 503);
+        assert_eq!(response.content.len(), 1);
 
-        if let ApiResponse::Message(msg) = response {
-            assert_eq!(msg.id, "msg_013Zva2CMHLNnXjNJJKqJ2EF");
-            assert_eq!(msg.model, "claude-3-7-sonnet-20250219");
-            assert!(matches!(msg.role, super::Role::Assistant));
-            assert_eq!(msg.stop_reason, "end_turn");
-            assert_eq!(msg.stop_sequence, None);
-            assert_eq!(msg.usage.input_tokens, 2095);
-            assert_eq!(msg.usage.output_tokens, 503);
-            assert_eq!(msg.content.len(), 1);
-
-            let super::Content::Text { text } = &msg.content[0];
-
-            assert_eq!(text, "Hi! My name is Claude.");
-        }
+        let super::Content::Text { text } = &response.content[0];
+        assert_eq!(text, "Hi! My name is Claude.");
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ApiResponse {
+    content: Vec<Content>,
+    id: String,
+    model: String,
+    role: Role,
+    stop_reason: String,
+    stop_sequence: Option<String>,
+    usage: Usage,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Usage {
+    input_tokens: u32,
+    output_tokens: u32,
 }
