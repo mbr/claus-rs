@@ -6,12 +6,30 @@
 //! typical interaction is through the [`MessageRequestBuilder`]:
 //!
 //! ```
-//! use klaus::{Api, MessageRequestBuilder};
+//! use klaus::{Api, HttpRequest, MessagesRequestBuilder, Role};
 //!
 //! let api = Api::new("sk-ant-api03-...");
 //!
-//! let http_request: HttpRequest = MessageRequestBuilder::new()
+//! let http_request: HttpRequest = MessagesRequestBuilder::new()
+//!     .push_message(Role::User, "Hello, world!")
 //!     .build(&api);
+//!
+//! assert_eq!(http_request.url.as_ref(), "https://api.anthropic.com/v1/messages");
+//! assert_eq!(http_request.method, "POST");
+//!
+//! assert_eq!(
+//!     http_request.render_headers(),
+//!     "content-type: application/json\n\
+//!      anthropic-version: 2023-06-01\n\
+//!      x-api-key: sk-ant-api03-...\n\
+//!      anthropic-model: claude-sonnet-4-20250514\n\
+//!      max-tokens: 1024"
+//! );
+//!
+//! assert_eq!(
+//!     &http_request.body,
+//!     r#"{"messages":[{"role":"user","content":{"type":"text","text":"Hello, world!"}}]}"#
+//! );
 //!
 //! // now the request can be sent with any HTTP client
 //! ```
@@ -32,7 +50,7 @@ pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 
 /// An Anthropic API configuration.
 #[derive(Debug)]
-struct Api {
+pub struct Api {
     /// The Anthropic API key.
     api_key: Arc<str>,
     /// The default model to use for requests.
@@ -94,19 +112,29 @@ impl Api {
 ///
 /// This type represents an HTTP request that can be sent to the Anthropic API.
 #[derive(Debug)]
-struct HttpRequest {
+pub struct HttpRequest {
     /// Request URL.
-    url: Arc<str>,
+    pub url: Arc<str>,
     /// HTTP method.
-    method: &'static str,
+    pub method: &'static str,
     /// Request headers.
-    headers: Vec<(&'static str, Arc<str>)>,
+    pub headers: Vec<(&'static str, Arc<str>)>,
     /// Request body.
-    body: String,
+    pub body: String,
+}
+
+impl HttpRequest {
+    pub fn render_headers(&self) -> String {
+        self.headers
+            .iter()
+            .map(|(k, v)| format!("{}: {}", k, v.as_ref()))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 #[derive(Debug)]
-struct MessagesRequestBuilder {
+pub struct MessagesRequestBuilder {
     /// The model to use for the request.
     ///
     /// If none is provided, the default model will be used.
@@ -169,8 +197,13 @@ impl MessagesRequestBuilder {
     }
 
     /// Constructs and appends a message to the request.
-    pub fn push_message(self, role: Role, content: Content) -> Self {
-        let message = Message { role, content };
+    pub fn push_message<S: Into<String>>(self, role: Role, content: S) -> Self {
+        let message = Message {
+            role,
+            content: Content::Text {
+                text: content.into(),
+            },
+        };
         self.push(message)
     }
 
@@ -206,7 +239,7 @@ impl MessagesRequestBuilder {
 }
 
 #[derive(Clone, Debug)]
-enum Role {
+pub enum Role {
     User,
     Assistant,
     Other(String),
@@ -248,7 +281,7 @@ struct Message {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 enum Content {
-    Text(String),
+    Text { text: String },
     // not supported: Image
 }
 
