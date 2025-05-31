@@ -28,7 +28,11 @@ fn main() {
             .build(&api);
 
         let raw = client
-            .execute(http_req.try_into_reqwest_blocking().expect("failed to convert to reqwest request"))
+            .execute(
+                http_req
+                    .try_into_reqwest_blocking()
+                    .expect("failed to convert to reqwest request"),
+            )
             .expect("failed to execute request")
             .text()
             .expect("failed to fetch contents");
