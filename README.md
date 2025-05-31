@@ -12,7 +12,8 @@ Klaus is set apart by a few features from many other implementations:
 On the lowest layer sits an [`Api`] struct, which represents the configuration for making requests. You will need [an API key](https://console.anthropic.com/settings/keys) to utilize it. Once it is set up, you can create calls to the API through the [`MessagesRequestBuilder`]:
 
 ```rust
-use klaus::{Api, HttpRequest, MessagesRequestBuilder, Role};
+use klaus::{Api, HttpRequest, MessagesRequestBuilder};
+use klaus::anthropic::Role;
 
 let api = Api::new("sk-ant-api03-...");
 
@@ -45,10 +46,10 @@ Calling the Anthropic API means sending the entire conversation every time a req
 
 ## Higher-level: Conversations
 
-For conversation management, you can use the [`Conversation`] type:
+For conversation management, you can use the [`conversation::Conversation`] type:
 
 ```rust
-use klaus::{Api, Conversation};
+use klaus::{Api, conversation::Conversation};
 
 let api = Api::new("sk-ant-api03-...");
 let mut conversation = Conversation::new(api);

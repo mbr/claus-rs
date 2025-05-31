@@ -2,17 +2,14 @@
 
 use std::sync::Arc;
 
-use crate::{
-    Api, Error, HttpRequest, Message, MessagesRequestBuilder, MessagesResponse, Role,
-    anthropic::deserialize_response,
-};
+use crate::{Api, Error, HttpRequest, MessagesRequestBuilder, anthropic};
 
 /// A conversation that manages message history and generates HTTP requests.
 #[derive(Debug)]
 pub struct Conversation {
     api: Api,
     system: Option<String>,
-    messages: Vec<Arc<Message>>,
+    messages: Vec<Arc<anthropic::Message>>,
 }
 
 impl Conversation {
@@ -34,7 +31,7 @@ impl Conversation {
     /// Adds a user message and returns an HTTP request to send.
     pub fn chat_message<S: Into<String>>(&mut self, user_message: S) -> HttpRequest {
         // Add user message to history
-        let message = Message::from_text(Role::User, user_message);
+        let message = anthropic::Message::from_text(anthropic::Role::User, user_message);
         self.messages.push(Arc::new(message));
 
         // Build and return HTTP request with full conversation history
@@ -52,7 +49,7 @@ impl Conversation {
     /// This method parses the response, adds the assistant's message to the conversation
     /// history, and returns the text content of the response.
     pub fn handle_response(&mut self, response_json: &str) -> Result<String, Error> {
-        let response: MessagesResponse = deserialize_response(response_json)?;
+        let response: anthropic::MessagesResponse = anthropic::deserialize_response(response_json)?;
 
         // Add assistant's message to history
         self.messages.push(Arc::new(response.message.clone()));

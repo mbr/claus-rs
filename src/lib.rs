@@ -6,13 +6,6 @@ pub mod conversation;
 use std::{fmt, sync::Arc};
 
 use anthropic::MessagesBody;
-// Re-export types from anthropic module
-pub use anthropic::{
-    ANTHROPIC_VERSION, ApiError, ApiResponse, Content, DEFAULT_ENDPOINT_HOST, DEFAULT_MODEL,
-    Message, MessagesResponse, Role, Usage, deserialize_response,
-};
-// Re-export conversation types
-pub use conversation::Conversation;
 
 /// An Anthropic API configuration.
 #[derive(Debug)]
@@ -34,15 +27,15 @@ impl Api {
     pub fn new<S: Into<Arc<str>>>(api_key: S) -> Self {
         Self {
             api_key: api_key.into(),
-            default_model: Arc::from(DEFAULT_MODEL),
+            default_model: Arc::from(anthropic::DEFAULT_MODEL),
             default_max_tokens: 1024,
-            endpoint_host: Arc::from(DEFAULT_ENDPOINT_HOST),
+            endpoint_host: Arc::from(anthropic::DEFAULT_ENDPOINT_HOST),
         }
     }
 
     /// Sets the default model for requests.
     ///
-    /// If not set, [`DEFAULT_MODEL`] will be used.
+    /// If not set, [`anthropic::DEFAULT_MODEL`] will be used.
     pub fn default_model<S: Into<Arc<str>>>(mut self, model: S) -> Self {
         self.default_model = model.into();
         self
@@ -58,7 +51,7 @@ impl Api {
 
     /// Sets the API endpoint host.
     ///
-    /// If not set, [`DEFAULT_ENDPOINT_HOST`] will be used.
+    /// If not set, [`anthropic::DEFAULT_ENDPOINT_HOST`] will be used.
     pub fn endpoint_host<S: Into<Arc<str>>>(mut self, endpoint_host: S) -> Self {
         self.endpoint_host = endpoint_host.into();
         self
@@ -68,7 +61,7 @@ impl Api {
     fn create_default_headers(&self) -> Vec<(&'static str, Arc<str>)> {
         vec![
             ("content-type", Arc::from("application/json")),
-            ("anthropic-version", Arc::from(ANTHROPIC_VERSION)),
+            ("anthropic-version", Arc::from(anthropic::ANTHROPIC_VERSION)),
             ("x-api-key", self.api_key.clone()),
         ]
     }
@@ -137,13 +130,16 @@ pub struct MessagesRequestBuilder {
     /// The system prompt for the conversation.
     system: Option<String>,
     /// The messages to send.
-    messages: Vec<Arc<Message>>,
+    messages: Vec<Arc<anthropic::Message>>,
     // Note: Missing: container, mcp_servers, metadata, service_tier,
     //                stop_sequences, stream, temperature, thinking,
     //                tool_choice, tools, top_k, top_p
 }
 
-fn serialize_arc_vec<S>(messages: &Vec<Arc<Message>>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_arc_vec<S>(
+    messages: &Vec<Arc<anthropic::Message>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -191,19 +187,19 @@ impl MessagesRequestBuilder {
     }
 
     /// Appends a message to the request.
-    pub fn push<M: Into<Arc<Message>>>(mut self, message: M) -> Self {
+    pub fn push<M: Into<Arc<anthropic::Message>>>(mut self, message: M) -> Self {
         self.messages.push(message.into());
         self
     }
 
     /// Constructs and appends a message to the request.
-    pub fn push_message<S: Into<String>>(self, role: Role, text: S) -> Self {
-        let message = Message::from_text(role, text);
+    pub fn push_message<S: Into<String>>(self, role: anthropic::Role, text: S) -> Self {
+        let message = anthropic::Message::from_text(role, text);
         self.push(message)
     }
 
     /// Replace all messages in the request with given messages.
-    pub fn set_messages(mut self, messages: Vec<Arc<Message>>) -> Self {
+    pub fn set_messages(mut self, messages: Vec<Arc<anthropic::Message>>) -> Self {
         self.messages = messages;
         self
     }
@@ -259,7 +255,7 @@ pub enum Error {
     #[error("Deserialization error: {0}")]
     Serde(#[from] serde_json::Error),
     #[error("API error: {0}")]
-    Api(#[from] ApiError),
+    Api(#[from] anthropic::ApiError),
     #[error("Unexpected response type")]
     UnexpectedResponseType,
 }
@@ -338,7 +334,7 @@ impl From<HttpRequest> for reqwest::blocking::Request {
 
 #[cfg(test)]
 mod tests {
-    use super::{ApiError, Content, MessagesResponse, Role, deserialize_response};
+    use super::anthropic::{ApiError, Content, MessagesResponse, Role, deserialize_response};
 
     #[cfg(feature = "reqwest")]
     #[test]
@@ -515,7 +511,7 @@ mod tests {
 
         let http_request = super::MessagesRequestBuilder::new()
             .system("You are a helpful assistant.")
-            .push_message(Role::User, "Hello!")
+            .push_message(super::anthropic::Role::User, "Hello!")
             .build(&api);
 
         assert_eq!(http_request.method, "POST");
