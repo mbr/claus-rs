@@ -293,27 +293,64 @@ enum Error {}
 // Below are features that may be feature-gated later.
 
 #[cfg(feature = "reqwest")]
-impl TryFrom<HttpRequest> for reqwest::Request {
-    type Error = Box<dyn std::error::Error>;
+impl HttpRequest {
+    /// Converts this HttpRequest into a reqwest::Request.
+    pub fn try_into_reqwest(self) -> Result<reqwest::Request, Box<dyn std::error::Error>> {
+        let method = reqwest::Method::from_bytes(self.method.as_bytes())?;
 
-    fn try_from(http_request: HttpRequest) -> Result<Self, Self::Error> {
-        let method = reqwest::Method::from_bytes(http_request.method.as_bytes())?;
-
-        let url = reqwest::Url::parse(&http_request.url)?;
+        let url = reqwest::Url::parse(&self.url)?;
         let mut request = reqwest::Request::new(method, url);
 
         // Set body
-        *request.body_mut() = Some(http_request.body.into());
+        *request.body_mut() = Some(self.body.into());
 
         // Add headers
         let headers = request.headers_mut();
-        for (key, value) in http_request.headers {
+        for (key, value) in self.headers {
             let header_name = reqwest::header::HeaderName::from_bytes(key.as_bytes())?;
             let header_value = reqwest::header::HeaderValue::from_str(&value)?;
             headers.insert(header_name, header_value);
         }
 
         Ok(request)
+    }
+}
+
+#[cfg(feature = "reqwest-blocking")]
+impl HttpRequest {
+    /// Converts this HttpRequest into a reqwest::blocking::Request.
+    pub fn try_into_reqwest_blocking(self) -> Result<reqwest::blocking::Request, Box<dyn std::error::Error>> {
+        let method = reqwest::Method::from_bytes(self.method.as_bytes())?;
+
+        let url = reqwest::Url::parse(&self.url)?;
+        let mut request = reqwest::blocking::Request::new(method, url);
+
+        // Set body
+        *request.body_mut() = Some(self.body.into());
+
+        // Add headers
+        let headers = request.headers_mut();
+        for (key, value) in self.headers {
+            let header_name = reqwest::header::HeaderName::from_bytes(key.as_bytes())?;
+            let header_value = reqwest::header::HeaderValue::from_str(&value)?;
+            headers.insert(header_name, header_value);
+        }
+
+        Ok(request)
+    }
+}
+
+#[cfg(feature = "reqwest")]
+impl From<HttpRequest> for reqwest::Request {
+    fn from(http_request: HttpRequest) -> Self {
+        http_request.try_into_reqwest().expect("failed to convert to reqwest::Request")
+    }
+}
+
+#[cfg(feature = "reqwest-blocking")]
+impl From<HttpRequest> for reqwest::blocking::Request {
+    fn from(http_request: HttpRequest) -> Self {
+        http_request.try_into_reqwest_blocking().expect("failed to convert to reqwest::blocking::Request")
     }
 }
 
@@ -343,6 +380,47 @@ mod tests {
 
         // Convert to reqwest::Request
         let reqwest_request: reqwest::Request = http_request
+            .try_into()
+            .expect("should convert successfully");
+
+        assert_eq!(reqwest_request.method(), &reqwest::Method::POST);
+        assert_eq!(
+            reqwest_request.url().as_str(),
+            "https://api.anthropic.com/v1/messages"
+        );
+
+        let headers = reqwest_request.headers();
+        assert_eq!(headers.get("content-type").unwrap(), "application/json");
+        assert_eq!(headers.get("anthropic-version").unwrap(), "2023-06-01");
+        assert_eq!(headers.get("x-api-key").unwrap(), "test-key");
+
+        let body = reqwest_request.body().unwrap();
+        let body_bytes = body.as_bytes().unwrap();
+        let body_str = std::str::from_utf8(body_bytes).unwrap();
+        assert!(body_str.contains("Hello, world!"));
+        assert!(body_str.contains("\"type\":\"text\""));
+    }
+
+    #[cfg(feature = "reqwest-blocking")]
+    #[test]
+    fn test_http_request_to_reqwest_blocking_conversion() {
+        let http_request = HttpRequest {
+            url: Arc::from("https://api.anthropic.com/v1/messages"),
+            method: "POST",
+            headers: vec![
+                ("content-type", Arc::from("application/json")),
+                ("anthropic-version", Arc::from("2023-06-01")),
+                ("x-api-key", Arc::from("test-key")),
+                ("anthropic-model", Arc::from("claude-3-sonnet-20240229")),
+                ("max-tokens", Arc::from("1024")),
+            ],
+            body:
+                r#"{"messages":[{"role":"user","content":{"type":"text","text":"Hello, world!"}}]}"#
+                    .to_string(),
+        };
+
+        // Convert to reqwest::blocking::Request
+        let reqwest_request: reqwest::blocking::Request = http_request
             .try_into()
             .expect("should convert successfully");
 

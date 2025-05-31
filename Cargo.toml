@@ -6,9 +6,18 @@ edition = "2024"
 [features]
 default = []
 reqwest = ["dep:reqwest"]
+reqwest-blocking = ["reqwest", "reqwest/blocking"]
+
+[[example]]
+name = "chat"
+path = "examples/chat.rs"
+required-features = ["reqwest"]
 
 [dependencies]
 reqwest = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+reqwest = { workspace = true, features = ["blocking"] }
