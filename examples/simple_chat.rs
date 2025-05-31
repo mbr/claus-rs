@@ -50,48 +50,40 @@ fn main() -> io::Result<()> {
 
     // Set up reedline with custom keybindings
     let mut keybindings = default_emacs_keybindings();
-    
+
     // Regular Enter sends the message (standard chat behavior)
-    keybindings.add_binding(
-        KeyModifiers::NONE,
-        KeyCode::Enter,
-        ReedlineEvent::Enter,
-    );
-    
+    keybindings.add_binding(KeyModifiers::NONE, KeyCode::Enter, ReedlineEvent::Enter);
+
     // Alt+Enter adds newlines when you specifically want them
     keybindings.add_binding(
         KeyModifiers::ALT,
         KeyCode::Enter,
         ReedlineEvent::Edit(vec![EditCommand::InsertNewline]),
     );
-    
+
     // Keep Ctrl+Enter as backup in case it works
-    keybindings.add_binding(
-        KeyModifiers::CONTROL,
-        KeyCode::Enter,
-        ReedlineEvent::Enter,
-    );
+    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Enter, ReedlineEvent::Enter);
 
     let edit_mode = Box::new(Emacs::new(keybindings));
-    
+
     let mut line_editor = Reedline::create()
         .with_edit_mode(edit_mode)
         .with_validator(Box::new(DefaultValidator))
         .with_completer(Box::new(DefaultCompleter::default()))
         .with_hinter(Box::new(DefaultHinter::default()));
-    
+
     let prompt = ChatPrompt;
-    
+
     println!("Chat with Claude! Intuitive Multiline Input:");
     println!("- Enter: Send message");
-    println!("- Alt+Enter: Add newlines when needed");  
+    println!("- Alt+Enter: Add newlines when needed");
     println!("- Copy/paste: Multiline content works perfectly");
     println!("- Ctrl+C: Exit");
     println!();
 
     loop {
         let sig = line_editor.read_line(&prompt);
-        
+
         match sig {
             Ok(Signal::Success(buffer)) => {
                 let user_message = if buffer.contains("\\n") {
@@ -100,7 +92,7 @@ fn main() -> io::Result<()> {
                 } else {
                     buffer.trim().to_string()
                 };
-                
+
                 // Skip empty messages
                 if user_message.is_empty() {
                     continue;
@@ -115,7 +107,7 @@ fn main() -> io::Result<()> {
                     .expect("failed to convert to reqwest request");
 
                 println!("Sending request...");
-                
+
                 let raw = client
                     .execute(reqwest_req)
                     .expect("failed to execute request")
@@ -150,6 +142,6 @@ fn main() -> io::Result<()> {
             }
         }
     }
-    
+
     Ok(())
 }
