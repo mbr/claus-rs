@@ -416,38 +416,6 @@ pub enum Error {
     Other(Box<dyn ::core::error::Error + Send>),
 }
 
-pub trait Parseable {
-    fn parse_response(self) -> Result<ApiResponse, Error>;
-}
-
-impl<'a> Parseable for &'a str {
-    fn parse_response(self) -> Result<ApiResponse, Error> {
-        deserialize_response(self)
-    }
-}
-
-impl Parseable for String {
-    fn parse_response(self) -> Result<ApiResponse, Error> {
-        Parseable::parse_response(self.as_str())
-    }
-}
-
-#[cfg(feature = "reqwest")]
-impl Parseable for reqwest::Response {
-    fn parse_response(self) -> Result<ApiResponse, Error> {
-        let raw = self.text().map_err(Error::Other)?;
-        Parseable::parse_response(raw)
-    }
-}
-
-#[cfg(feature = "reqwest-blocking")]
-impl Parseable for reqwest::blocking::Response {
-    fn parse_response(self) -> Result<ApiResponse, Error> {
-        let raw = self.text().map_err(|e| Error::Other(Box::new(e)))?;
-        Parseable::parse_response(raw)
-    }
-}
-
 // Below are features that may be feature-gated later.
 
 #[cfg(feature = "reqwest")]

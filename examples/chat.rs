@@ -1,6 +1,6 @@
 use std::{env, fs};
 
-use klaus::{Parseable, Role};
+use klaus::{Role, deserialize_response};
 
 fn main() {
     let key_file = env::args()
@@ -19,13 +19,12 @@ fn main() {
 
     println!("{}", messages);
 
-    let response = client
+    let raw = client
         .execute(messages.into())
-        .expect("failed to execute request");
+        .expect("failed to execute request")
+        .text()
+        .expect("failed to fetch contents");
 
-    println!("{:?}", response);
-    println!("{:?}", response.text().unwrap());
-    let response = response.parse_response().expect("failed to parse response");
-
+    let response = deserialize_response(&raw).expect("failed to parse response");
     println!("{:?}", response);
 }
