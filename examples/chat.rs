@@ -17,10 +17,12 @@ fn main() {
         .push_message(Role::User, "Hello, how are you?")
         .build(&api);
 
+    println!("{}", messages);
+
     let response = client
         .execute(messages.into())
         .expect("failed to execute request");
 
     println!("{:?}", response);
-    println!("{:?}", response.text());
+    println!("{:?}", response.text().unwrap());
 }

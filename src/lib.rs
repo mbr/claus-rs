@@ -34,7 +34,7 @@
 //! // now the request can be sent with any HTTP client
 //! ```
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -139,7 +139,7 @@ impl std::fmt::Display for HttpRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Write request line
         writeln!(f, "{} {} HTTP/1.1", self.method, self.path)?;
-        
+
         // Write Host header first
         writeln!(f, "Host: {}", self.host)?;
 
@@ -177,6 +177,8 @@ pub struct MessagesRequestBuilder {
 
 #[derive(Debug, Serialize)]
 struct MessagesBody<'a> {
+    model: &'a str,
+    max_tokens: u32,
     #[serde(serialize_with = "serialize_arc_vec")]
     messages: &'a Vec<Arc<Message>>,
 }
@@ -225,9 +227,9 @@ impl MessagesRequestBuilder {
     pub fn push_message<S: Into<String>>(self, role: Role, content: S) -> Self {
         let message = Message {
             role,
-            content: Content::Text {
+            content: vec![Content::Text {
                 text: content.into(),
-            },
+            }],
         };
         self.push(message)
     }
@@ -248,11 +250,21 @@ impl MessagesRequestBuilder {
             headers.push(("max-tokens", Arc::from(api.default_max_tokens.to_string())));
         }
 
-        let body = MessagesBody {
-            messages: &self.messages,
-        };
+        let body = {
+            let model = if let Some(ref model) = self.model {
+                model.as_str()
+            } else {
+                &api.default_model
+            };
 
-        let body = serde_json::to_string(&body).expect("failed to serialize messages");
+            let body = MessagesBody {
+                model,
+                max_tokens: self.max_tokens.unwrap_or(api.default_max_tokens),
+                messages: &self.messages,
+            };
+
+            serde_json::to_string(&body).expect("failed to serialize messages")
+        };
 
         HttpRequest {
             host: api.endpoint_host.to_string(),
@@ -301,7 +313,7 @@ impl<'de> serde::Deserialize<'de> for Role {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Message {
     role: Role,
-    content: Content,
+    content: Vec<Content>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -346,7 +358,9 @@ impl HttpRequest {
 #[cfg(feature = "reqwest-blocking")]
 impl HttpRequest {
     /// Converts this HttpRequest into a reqwest::blocking::Request.
-    pub fn try_into_reqwest_blocking(self) -> Result<reqwest::blocking::Request, Box<dyn std::error::Error>> {
+    pub fn try_into_reqwest_blocking(
+        self,
+    ) -> Result<reqwest::blocking::Request, Box<dyn std::error::Error>> {
         let method = reqwest::Method::from_bytes(self.method.as_bytes())?;
 
         let url_string = format!("https://{}{}", self.host, self.path);
@@ -371,14 +385,18 @@ impl HttpRequest {
 #[cfg(feature = "reqwest")]
 impl From<HttpRequest> for reqwest::Request {
     fn from(http_request: HttpRequest) -> Self {
-        http_request.try_into_reqwest().expect("failed to convert to reqwest::Request")
+        http_request
+            .try_into_reqwest()
+            .expect("failed to convert to reqwest::Request")
     }
 }
 
 #[cfg(feature = "reqwest-blocking")]
 impl From<HttpRequest> for reqwest::blocking::Request {
     fn from(http_request: HttpRequest) -> Self {
-        http_request.try_into_reqwest_blocking().expect("failed to convert to reqwest::blocking::Request")
+        http_request
+            .try_into_reqwest_blocking()
+            .expect("failed to convert to reqwest::blocking::Request")
     }
 }
 
