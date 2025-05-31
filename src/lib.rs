@@ -1,18 +1,18 @@
 //! Klaus. The AI client, Claude's German second-degree cousin.
-//! 
+//!
 //! The crate separates IO from the protocol, thus it can be run with a variety of backends.
-//! 
+//!
 //! At its core sits the [`Api`] struct, which holds common information for all requests. A
 //! typical interaction is through the [`MessageRequestBuilder`]:
-//! 
+//!
 //! ```
 //! use klaus::{Api, MessageRequestBuilder};
-//! 
+//!
 //! let api = Api::new("sk-ant-api03-...");
-//! 
+//!
 //! let http_request: HttpRequest = MessageRequestBuilder::new()
 //!     .build(&api);
-//! 
+//!
 //! // now the request can be sent with any HTTP client
 //! ```
 
@@ -30,7 +30,6 @@ pub const DEFAULT_ENDPOINT: &str = "https://api.anthropic.com/v1";
 /// Default model to use for requests.
 pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 
-
 /// An Anthropic API configuration.
 #[derive(Debug)]
 struct Api {
@@ -43,7 +42,6 @@ struct Api {
     /// The API endpoint without a trailing slash.
     endpoint: Arc<str>,
 }
-
 
 impl Api {
     /// Creates a new Anthropic API instance.
@@ -59,7 +57,7 @@ impl Api {
     }
 
     /// Sets the default model for requests.
-    /// 
+    ///
     /// If not set, [`DEFAULT_MODEL`] will be used.
     pub fn default_model<S: Into<Arc<str>>>(mut self, model: S) -> Self {
         self.default_model = model.into();
@@ -67,7 +65,7 @@ impl Api {
     }
 
     /// Sets the default maximum tokens for responses.
-    /// 
+    ///
     /// If not set, the default is 1024.
     pub fn default_max_tokens(mut self, max_tokens: u32) -> Self {
         self.default_max_tokens = max_tokens;
@@ -75,7 +73,7 @@ impl Api {
     }
 
     /// Sets the API endpoint.
-    /// 
+    ///
     /// If not set, [`DEFAULT_ENDPOINT`] will be used.
     pub fn endpoint<S: Into<Arc<str>>>(mut self, endpoint: S) -> Self {
         self.endpoint = endpoint.into();
@@ -92,9 +90,8 @@ impl Api {
     }
 }
 
-
 /// HTTP request encapsulation.
-/// 
+///
 /// This type represents an HTTP request that can be sent to the Anthropic API.
 #[derive(Debug)]
 struct HttpRequest {
@@ -111,16 +108,15 @@ struct HttpRequest {
 #[derive(Debug)]
 struct MessagesRequestBuilder {
     /// The model to use for the request.
-    /// 
+    ///
     /// If none is provided, the default model will be used.
     model: Option<String>,
     /// The maximum number of tokens for the response.
-    /// 
+    ///
     /// If none is provided, the default max tokens will be used.
     max_tokens: Option<u32>,
     /// The messages to send.
     messages: Vec<Arc<Message>>,
-
     // Note: Missing: container, mcp_servers, metadata, service_tier,
     //                stop_sequences, stream, system, temperature, thinking,
     //                tool_choice, tools, top_k, top_p
@@ -194,17 +190,17 @@ impl MessagesRequestBuilder {
             headers.push(("max-tokens", Arc::from(api.default_max_tokens.to_string())));
         }
 
-        let body = MessagesBody{
+        let body = MessagesBody {
             messages: &self.messages,
         };
 
         let body = serde_json::to_string(&body).expect("failed to serialize messages");
 
-        HttpRequest { 
+        HttpRequest {
             url: Arc::from("https://api.anthropic.com/v1/messages"),
             method: "POST",
-            headers, 
-            body 
+            headers,
+            body,
         }
     }
 }
