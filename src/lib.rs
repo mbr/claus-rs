@@ -369,7 +369,21 @@ enum ApiResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct MessagesResponse {}
+struct MessagesResponse {
+    content: Vec<Content>,
+    id: String,
+    model: String,
+    role: Role,
+    stop_reason: String,
+    stop_sequence: Option<String>,
+    usage: Usage,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Usage {
+    input_tokens: u32,
+    output_tokens: u32,
+}
 
 // Below are features that may be feature-gated later.
 
@@ -571,5 +585,47 @@ mod tests {
                 error: ApiError::InvalidRequestError
             }
         ));
+    }
+
+    #[test]
+    fn test_api_response_message_deserialization() {
+        let json = r#"{
+  "content": [
+    {
+      "text": "Hi! My name is Claude.",
+      "type": "text"
+    }
+  ],
+  "id": "msg_013Zva2CMHLNnXjNJJKqJ2EF",
+  "model": "claude-3-7-sonnet-20250219",
+  "role": "assistant",
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "type": "message",
+  "usage": {
+    "input_tokens": 2095,
+    "output_tokens": 503
+  }
+}"#;
+
+        let response: ApiResponse =
+            serde_json::from_str(json).expect("should deserialize API message response");
+
+        assert!(matches!(response, ApiResponse::Message(_)));
+
+        if let ApiResponse::Message(msg) = response {
+            assert_eq!(msg.id, "msg_013Zva2CMHLNnXjNJJKqJ2EF");
+            assert_eq!(msg.model, "claude-3-7-sonnet-20250219");
+            assert!(matches!(msg.role, super::Role::Assistant));
+            assert_eq!(msg.stop_reason, "end_turn");
+            assert_eq!(msg.stop_sequence, None);
+            assert_eq!(msg.usage.input_tokens, 2095);
+            assert_eq!(msg.usage.output_tokens, 503);
+            assert_eq!(msg.content.len(), 1);
+
+            let super::Content::Text { text } = &msg.content[0];
+
+            assert_eq!(text, "Hi! My name is Claude.");
+        }
     }
 }
