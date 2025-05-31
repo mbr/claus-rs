@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::{Api, Error, HttpRequest, MessagesRequestBuilder, anthropic};
+use crate::{Api, Error, MessagesRequestBuilder, anthropic, http_request::HttpRequest};
 
 /// A conversation that manages message history and generates HTTP requests.
 #[derive(Debug)]

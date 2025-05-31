@@ -12,8 +12,9 @@ Klaus is set apart by a few features from many other implementations:
 On the lowest layer sits an [`Api`] struct, which represents the configuration for making requests. You will need [an API key](https://console.anthropic.com/settings/keys) to utilize it. Once it is set up, you can create calls to the API through the [`MessagesRequestBuilder`]:
 
 ```rust
-use klaus::{Api, HttpRequest, MessagesRequestBuilder};
+use klaus::{Api, MessagesRequestBuilder};
 use klaus::anthropic::Role;
+use klaus::http_request::HttpRequest;
 
 let api = Api::new("sk-ant-api03-...");
 

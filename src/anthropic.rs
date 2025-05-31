@@ -6,7 +6,7 @@ use std::{fmt, fmt::Display, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, serialize_arc_vec};
+use crate::Error;
 
 /// API version that is compatible with this module.
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -207,4 +207,16 @@ pub struct MessagesResponse {
 pub struct Usage {
     pub input_tokens: u32,
     pub output_tokens: u32,
+}
+
+fn serialize_arc_vec<S>(messages: &Vec<Arc<Message>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeSeq;
+    let mut seq = serializer.serialize_seq(Some(messages.len()))?;
+    for message in messages {
+        seq.serialize_element(&**message)?;
+    }
+    seq.end()
 }

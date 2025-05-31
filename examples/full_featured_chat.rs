@@ -46,7 +46,7 @@ fn main() -> io::Result<()> {
     let api = klaus::Api::new(api_key);
 
     // Create a conversation instance
-    let mut conversation = klaus::Conversation::new(api);
+    let mut conversation = klaus::conversation::Conversation::new(api);
 
     // Set up reedline with custom keybindings
     let mut keybindings = default_emacs_keybindings();
