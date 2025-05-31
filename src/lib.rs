@@ -324,16 +324,51 @@ pub struct Message {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
+#[serde(tag = "type", rename_all = "snake_case")]
 enum Content {
     Text { text: String },
     // not supported: Image
 }
 
 /// Anthropic API error.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum ApiError {
+    /// HTTP 400, invalid request
+    #[error("Invalid request")]
+    InvalidRequestError,
+    /// HTTP 401, authentication error
+    #[error("Authentication error")]
+    AuthenticationError,
+    /// HTTP 403, your API key does not have permission to use the specified resource
+    #[error("Permission error")]
+    PermissionError,
+    /// HTTP 404, the requested resource was not found
+    #[error("Not found")]
+    NotFoundError,
+    /// HTTP 413, request exceeds the maximum allowed number of bytes
+    #[error("Request too large")]
+    RequestTooLarge,
+    /// HTTP 429, your account has hit a rate limit
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+    /// HTTP 500, an unexpected error has occurred internal to Anthropic's systems
+    #[error("API error")]
+    ApiError,
+    /// HTTP 529, Anthropic's API is temporarily overloaded
+    #[error("API overloaded")]
+    OverloadedError,
+}
 
-enum Error {}
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum ApiResponse {
+    Error { error: ApiError },
+    Message(MessagesResponse),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct MessagesResponse {}
 
 // Below are features that may be feature-gated later.
 
