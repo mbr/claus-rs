@@ -1,0 +1,264 @@
+//! Klaus. The AI client, Claude's German second-degree cousin.
+//! 
+//! The crate separates IO from the protocol, thus it can be run with a variety of backends.
+//! 
+//! At its core sits the [`Api`] struct, which holds common information for all requests. A
+//! typical interaction is through the [`MessageRequestBuilder`]:
+//! 
+//! ```
+//! use klaus::{Api, MessageRequestBuilder};
+//! 
+//! let api = Api::new("sk-ant-api03-...");
+//! 
+//! let http_request: HttpRequest = MessageRequestBuilder::new()
+//!     .build(&api);
+//! 
+//! // now the request can be sent with any HTTP client
+//! ```
+
+use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
+use serde_json;
+
+/// API version that is compatible with this module.
+pub const ANTHROPIC_VERSION: &str = "2023-06-01";
+
+/// Default API endpoint to use.
+pub const DEFAULT_ENDPOINT: &str = "https://api.anthropic.com/v1";
+
+/// Default model to use for requests.
+pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
+
+
+/// An Anthropic API configuration.
+#[derive(Debug)]
+struct Api {
+    /// The Anthropic API key.
+    api_key: Arc<str>,
+    /// The default model to use for requests.
+    default_model: Arc<str>,
+    /// The default maximum number of tokens for responses.
+    default_max_tokens: u32,
+    /// The API endpoint without a trailing slash.
+    endpoint: Arc<str>,
+}
+
+
+impl Api {
+    /// Creates a new Anthropic API instance.
+    ///
+    /// Requires a valid Anthropic API key.
+    pub fn new<S: Into<Arc<str>>>(api_key: S) -> Self {
+        Self {
+            api_key: api_key.into(),
+            default_model: Arc::from(DEFAULT_MODEL),
+            default_max_tokens: 1024,
+            endpoint: Arc::from(DEFAULT_ENDPOINT),
+        }
+    }
+
+    /// Sets the default model for requests.
+    /// 
+    /// If not set, [`DEFAULT_MODEL`] will be used.
+    pub fn default_model<S: Into<Arc<str>>>(mut self, model: S) -> Self {
+        self.default_model = model.into();
+        self
+    }
+
+    /// Sets the default maximum tokens for responses.
+    /// 
+    /// If not set, the default is 1024.
+    pub fn default_max_tokens(mut self, max_tokens: u32) -> Self {
+        self.default_max_tokens = max_tokens;
+        self
+    }
+
+    /// Sets the API endpoint.
+    /// 
+    /// If not set, [`DEFAULT_ENDPOINT`] will be used.
+    pub fn endpoint<S: Into<Arc<str>>>(mut self, endpoint: S) -> Self {
+        self.endpoint = endpoint.into();
+        self
+    }
+
+    /// Creates the required headers for any API request.
+    fn create_default_headers(&self) -> Vec<(&'static str, Arc<str>)> {
+        vec![
+            ("content-type", Arc::from("application/json")),
+            ("anthropic-version", Arc::from(ANTHROPIC_VERSION)),
+            ("x-api-key", self.api_key.clone()),
+        ]
+    }
+}
+
+
+/// HTTP request encapsulation.
+/// 
+/// This type represents an HTTP request that can be sent to the Anthropic API.
+#[derive(Debug)]
+struct HttpRequest {
+    /// Request URL.
+    url: Arc<str>,
+    /// HTTP method.
+    method: &'static str,
+    /// Request headers.
+    headers: Vec<(&'static str, Arc<str>)>,
+    /// Request body.
+    body: String,
+}
+
+#[derive(Debug)]
+struct MessagesRequestBuilder {
+    /// The model to use for the request.
+    /// 
+    /// If none is provided, the default model will be used.
+    model: Option<String>,
+    /// The maximum number of tokens for the response.
+    /// 
+    /// If none is provided, the default max tokens will be used.
+    max_tokens: Option<u32>,
+    /// The messages to send.
+    messages: Vec<Arc<Message>>,
+
+    // Note: Missing: container, mcp_servers, metadata, service_tier,
+    //                stop_sequences, stream, system, temperature, thinking,
+    //                tool_choice, tools, top_k, top_p
+}
+
+#[derive(Debug, Serialize)]
+struct MessagesBody<'a> {
+    #[serde(serialize_with = "serialize_arc_vec")]
+    messages: &'a Vec<Arc<Message>>,
+}
+
+fn serialize_arc_vec<S>(messages: &Vec<Arc<Message>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeSeq;
+    let mut seq = serializer.serialize_seq(Some(messages.len()))?;
+    for message in messages {
+        seq.serialize_element(&**message)?;
+    }
+    seq.end()
+}
+
+impl MessagesRequestBuilder {
+    /// Creates a new message request builder.
+    pub fn new() -> Self {
+        Self {
+            model: None,
+            max_tokens: None,
+            messages: Vec::new(),
+        }
+    }
+
+    /// Sets the model for the request.
+    pub fn model<S: Into<String>>(mut self, model: S) -> Self {
+        self.model = Some(model.into());
+        self
+    }
+
+    /// Sets the maximum tokens for the request.
+    pub fn max_tokens(mut self, max_tokens: u32) -> Self {
+        self.max_tokens = Some(max_tokens);
+        self
+    }
+
+    /// Appends a message to the request.
+    pub fn push<M: Into<Arc<Message>>>(mut self, message: M) -> Self {
+        self.messages.push(message.into());
+        self
+    }
+
+    /// Constructs and appends a message to the request.
+    pub fn push_message(self, role: Role, content: Content) -> Self {
+        let message = Message { role, content };
+        self.push(message)
+    }
+
+    /// Builds the HTTP request.
+    pub fn build(&self, api: &Api) -> HttpRequest {
+        let mut headers = api.create_default_headers();
+
+        if let Some(model) = &self.model {
+            headers.push(("anthropic-model", Arc::from(model.as_str())));
+        } else {
+            headers.push(("anthropic-model", api.default_model.clone()));
+        }
+
+        if let Some(max_tokens) = self.max_tokens {
+            headers.push(("max-tokens", Arc::from(max_tokens.to_string())));
+        } else {
+            headers.push(("max-tokens", Arc::from(api.default_max_tokens.to_string())));
+        }
+
+        let body = MessagesBody{
+            messages: &self.messages,
+        };
+
+        let body = serde_json::to_string(&body).expect("failed to serialize messages");
+
+        HttpRequest { 
+            url: Arc::from("https://api.anthropic.com/v1/messages"),
+            method: "POST",
+            headers, 
+            body 
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum Role {
+    User,
+    Assistant,
+    Other(String),
+}
+
+impl serde::Serialize for Role {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Role::User => serializer.serialize_str("user"),
+            Role::Assistant => serializer.serialize_str("assistant"),
+            Role::Other(s) => serializer.serialize_str(s),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Role {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = <&str>::deserialize(deserializer)?;
+        match s {
+            "user" => Ok(Role::User),
+            "assistant" => Ok(Role::Assistant),
+            _ => Ok(Role::Other(s.to_string())),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct Message {
+    role: Role,
+    content: Content,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum Content {
+    Text(String),
+    // not supported: Image
+}
+
+/// Anthropic API error.
+#[derive(Debug, thiserror::Error)]
+
+enum Error {}
+
+// Below are features that may be feature-gated later.
