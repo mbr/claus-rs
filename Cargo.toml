@@ -9,13 +9,13 @@ reqwest = ["dep:reqwest"]
 reqwest-blocking = ["reqwest", "reqwest/blocking"]
 
 [[example]]
-name = "chat"
-path = "examples/chat.rs"
-required-features = ["reqwest"]
-
-[[example]]
 name = "simple_chat"
 path = "examples/simple_chat.rs"
+required-features = ["reqwest-blocking"]
+
+[[example]]
+name = "full_featured_chat"
+path = "examples/full_featured_chat.rs"
 required-features = ["reqwest-blocking"]
 
 [dependencies]
