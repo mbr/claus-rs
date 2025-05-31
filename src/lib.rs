@@ -36,11 +36,7 @@
 //! // now the request can be sent with any HTTP client
 //! ```
 
-use std::{
-    fmt,
-    fmt::{Display, Formatter},
-    sync::Arc,
-};
+use std::{fmt, fmt::Display, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
@@ -696,14 +692,16 @@ mod tests {
 
         assert_eq!(response.id, "msg_013Zva2CMHLNnXjNJJKqJ2EF");
         assert_eq!(response.model, "claude-3-7-sonnet-20250219");
-        assert!(matches!(response.role, super::Role::Assistant));
+        assert!(matches!(response.message.role, super::Role::Assistant));
         assert_eq!(response.stop_reason, "end_turn");
         assert_eq!(response.stop_sequence, None);
         assert_eq!(response.usage.input_tokens, 2095);
         assert_eq!(response.usage.output_tokens, 503);
-        assert_eq!(response.content.len(), 1);
+        assert_eq!(response.message.content.len(), 1);
 
-        let super::Content::Text { text } = &response.content[0];
+        let super::Content::Text { text } = &response.message.content[0] else {
+            panic!("should be text");
+        };
         assert_eq!(text, "Hi! My name is Claude.");
     }
 }

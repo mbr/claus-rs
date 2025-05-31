@@ -14,7 +14,7 @@ fn main() {
     let api = klaus::Api::new(api_key);
 
     let mut input = String::new();
-    let mut stdin = io::stdin();
+    let stdin = io::stdin();
 
     let mut messages = Vec::new();
 
