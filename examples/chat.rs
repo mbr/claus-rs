@@ -1,6 +1,6 @@
 use std::{env, fs};
 
-use klaus::Role;
+use klaus::{Parseable, Role};
 
 fn main() {
     let key_file = env::args()
@@ -25,4 +25,7 @@ fn main() {
 
     println!("{:?}", response);
     println!("{:?}", response.text().unwrap());
+    let response = response.parse_response().expect("failed to parse response");
+
+    println!("{:?}", response);
 }
