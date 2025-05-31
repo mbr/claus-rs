@@ -1,8 +1,30 @@
+//! Abstract HTTP request.
+//!
+//! The [`HttpRequest`] type represents an HTTP request that can (and should) be sent to the
+//! Anthropic API, without committing to a specific HTTP client.
+//!
+//! ## Features
+//!
+//! If the `reqwest`/`reqwest-blocking` feature is enabled, the [`HttpRequest`] type can be
+//! converted to a [`reqwest::Request`] or [`reqwest::blocking::Request`] using the
+//! `try_into_reqwest` or `try_into_reqwest_blocking` methods.
+
 use std::{fmt, sync::Arc};
 
 /// HTTP request encapsulation.
 ///
-/// This type represents an HTTP request that can be sent to the Anthropic API.
+/// This type represents an HTTP request. Supports pretty-printing the request as a string (through
+/// the [`std::fmt::Display`] trait).
+///
+/// ## `reqwest`/`reqwest-blocking` feature
+///
+/// If the `reqwest`/`reqwest-blocking` feature is enabled, the
+/// [`HttpRequest`] type can be converted to a `reqwest::Request` or
+/// `reqwest::blocking::Request` using the `try_into_reqwest` or `try_into_reqwest_blocking`
+/// methods.
+///
+/// Additionally, the `From<HttpRequest>` trait is implemented for `reqwest::Request` and
+/// `reqwest::blocking::Request`, beware that it will panic if the conversion fails.
 #[derive(Debug)]
 pub struct HttpRequest {
     /// Request host.
@@ -18,6 +40,10 @@ pub struct HttpRequest {
 }
 
 impl HttpRequest {
+    /// Renders the headers as a string.
+    ///
+    /// The returned string is suitable for use in an HTTP request unaltered. Does not include the
+    /// `Host` header.
     pub fn render_headers(&self) -> String {
         self.headers
             .iter()
@@ -29,13 +55,9 @@ impl HttpRequest {
 
 impl fmt::Display for HttpRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Write request line
         writeln!(f, "{} {} HTTP/1.1", self.method, self.path)?;
 
-        // Write Host header first
         writeln!(f, "Host: {}", self.host)?;
-
-        // Write other headers
         for (key, value) in &self.headers {
             writeln!(f, "{}: {}", key, value.as_ref())?;
         }
@@ -52,7 +74,7 @@ impl fmt::Display for HttpRequest {
 
 #[cfg(feature = "reqwest")]
 impl HttpRequest {
-    /// Converts this HttpRequest into a reqwest::Request.
+    /// Converts this [`HttpRequest`] into a [`reqwest::Request`].
     pub fn try_into_reqwest(self) -> Result<reqwest::Request, Box<dyn std::error::Error>> {
         let method = reqwest::Method::from_bytes(self.method.as_bytes())?;
 
@@ -60,10 +82,8 @@ impl HttpRequest {
         let url = reqwest::Url::parse(&url_string)?;
         let mut request = reqwest::Request::new(method, url);
 
-        // Set body
         *request.body_mut() = Some(self.body.into());
 
-        // Add headers
         let headers = request.headers_mut();
         for (key, value) in self.headers {
             let header_name = reqwest::header::HeaderName::from_bytes(key.as_bytes())?;
@@ -77,7 +97,7 @@ impl HttpRequest {
 
 #[cfg(feature = "reqwest-blocking")]
 impl HttpRequest {
-    /// Converts this HttpRequest into a reqwest::blocking::Request.
+    /// Converts this [`HttpRequest`] into a [`reqwest::blocking::Request`].
     pub fn try_into_reqwest_blocking(
         self,
     ) -> Result<reqwest::blocking::Request, Box<dyn std::error::Error>> {
@@ -87,10 +107,8 @@ impl HttpRequest {
         let url = reqwest::Url::parse(&url_string)?;
         let mut request = reqwest::blocking::Request::new(method, url);
 
-        // Set body
         *request.body_mut() = Some(self.body.into());
 
-        // Add headers
         let headers = request.headers_mut();
         for (key, value) in self.headers {
             let header_name = reqwest::header::HeaderName::from_bytes(key.as_bytes())?;

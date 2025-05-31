@@ -43,6 +43,9 @@ assert_eq!(
 // now the request can be sent with any HTTP client
 ```
 
+This produces [`http_request::HttpRequest`]s that need to be sent using a suitable HTTP client
+framework, see the module for details.
+
 Calling the Anthropic API means sending the entire conversation every time a request is made, i.e., you are responsible for attaching all responses to the set of messages (that includes the user's) every time a request is made. See [`examples/simple_chat.rs`](examples/simple_chat.rs) for a complete example.
 
 ## Higher-level: Conversations
