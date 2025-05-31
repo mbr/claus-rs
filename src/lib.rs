@@ -36,7 +36,11 @@
 //! // now the request can be sent with any HTTP client
 //! ```
 
-use std::sync::Arc;
+use std::{
+    fmt,
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -136,8 +140,8 @@ impl HttpRequest {
     }
 }
 
-impl std::fmt::Display for HttpRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for HttpRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Write request line
         writeln!(f, "{} {} HTTP/1.1", self.method, self.path)?;
 
@@ -231,14 +235,15 @@ impl MessagesRequestBuilder {
     }
 
     /// Constructs and appends a message to the request.
-    pub fn push_message<S: Into<String>>(self, role: Role, content: S) -> Self {
-        let message = Message {
-            role,
-            content: vec![Content::Text {
-                text: content.into(),
-            }],
-        };
+    pub fn push_message<S: Into<String>>(self, role: Role, text: S) -> Self {
+        let message = Message::from_text(role, text);
         self.push(message)
+    }
+
+    /// Replace all messages in the request with given messages.
+    pub fn set_messages(mut self, messages: Vec<Arc<Message>>) -> Self {
+        self.messages = messages;
+        self
     }
 
     /// Builds the HTTP request.
@@ -323,6 +328,33 @@ pub struct Message {
     content: Vec<Content>,
 }
 
+impl Message {
+    pub fn from_text<S: Into<String>>(role: Role, text: S) -> Self {
+        Self {
+            role,
+            content: vec![Content::from_text(text.into())],
+        }
+    }
+}
+
+impl IntoIterator for Message {
+    type Item = Content;
+    type IntoIter = std::vec::IntoIter<Content>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.content.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Message {
+    type Item = &'a Content;
+    type IntoIter = std::slice::Iter<'a, Content>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.content.iter()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Content {
@@ -330,7 +362,20 @@ pub enum Content {
     Image,
 }
 
+impl Display for Content {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Content::Text { text } => f.write_str(text),
+            Content::Image => f.write_str("<image>"),
+        }
+    }
+}
+
 impl Content {
+    pub fn from_text<S: Into<String>>(text: S) -> Self {
+        Content::Text { text: text.into() }
+    }
+
     pub fn as_text(&self) -> Option<&str> {
         if let Content::Text { text } = self {
             return Some(text.as_str());
@@ -665,31 +710,13 @@ mod tests {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MessagesResponse {
-    content: Vec<Content>,
-    id: String,
-    model: String,
-    role: Role,
-    stop_reason: String,
-    stop_sequence: Option<String>,
-    usage: Usage,
-}
-
-impl IntoIterator for MessagesResponse {
-    type Item = Content;
-    type IntoIter = std::vec::IntoIter<Content>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.content.into_iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a MessagesResponse {
-    type Item = &'a Content;
-    type IntoIter = std::slice::Iter<'a, Content>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.content.iter()
-    }
+    pub id: String,
+    pub model: String,
+    pub stop_reason: String,
+    pub stop_sequence: Option<String>,
+    pub usage: Usage,
+    #[serde(flatten)]
+    pub message: Message,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

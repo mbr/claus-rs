@@ -1,6 +1,6 @@
-use std::{env, fs};
+use std::{env, fs, io, mem, sync::Arc};
 
-use klaus::{MessagesResponse, Role, deserialize_response};
+use klaus::{Message, MessagesResponse, Role, deserialize_response};
 
 fn main() {
     let key_file = env::args()
@@ -13,24 +13,32 @@ fn main() {
     let api_key = fs::read_to_string(key_file).expect("failed to read key");
     let api = klaus::Api::new(api_key);
 
-    let messages = klaus::MessagesRequestBuilder::new()
-        .push_message(Role::User, "Hello, how are you?")
-        .build(&api);
+    let mut input = String::new();
+    let mut stdin = io::stdin();
 
-    println!("{}", messages);
+    let mut messages = Vec::new();
 
-    let raw = client
-        .execute(messages.into())
-        .expect("failed to execute request")
-        .text()
-        .expect("failed to fetch contents");
+    while stdin.read_line(&mut input).expect("stdin failed to read") != 0 {
+        messages.push(Arc::new(Message::from_text(
+            Role::User,
+            mem::take(&mut input),
+        )));
+        let http_req = klaus::MessagesRequestBuilder::new()
+            .set_messages(messages.clone())
+            .build(&api);
 
-    let response: MessagesResponse = deserialize_response(&raw).expect("failed to parse response");
-    for content in &response {
-        let Some(text) = content.as_text() else {
-            continue;
-        };
-    println!("{}", text);
+        let raw = client
+            .execute(http_req.into())
+            .expect("failed to execute request")
+            .text()
+            .expect("failed to fetch contents");
 
+        let response: MessagesResponse =
+            deserialize_response(&raw).expect("failed to parse response");
+
+        for content in &response.message {
+            println!("Claude: {}", content);
+        }
+        messages.push(Arc::new(response.message));
     }
 }
