@@ -18,6 +18,10 @@ name = "simple_chat"
 path = "examples/simple_chat.rs"
 required-features = ["reqwest-blocking"]
 
+[[example]]
+name = "key_test"
+path = "examples/key_test.rs"
+
 [dependencies]
 reqwest = { workspace = true, optional = true }
 serde.workspace = true

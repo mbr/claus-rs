@@ -48,50 +48,66 @@ fn main() -> io::Result<()> {
     // Create a conversation instance
     let mut conversation = klaus::Conversation::new(api);
 
-    // Set up reedline with custom keybindings for Shift+Enter
+    // Set up reedline with custom keybindings
     let mut keybindings = default_emacs_keybindings();
-
-    // Shift+Enter should insert a newline (multiline mode)
+    
+    // Regular Enter sends the message (standard chat behavior)
     keybindings.add_binding(
-        KeyModifiers::SHIFT,
+        KeyModifiers::NONE,
+        KeyCode::Enter,
+        ReedlineEvent::Enter,
+    );
+    
+    // Alt+Enter adds newlines when you specifically want them
+    keybindings.add_binding(
+        KeyModifiers::ALT,
         KeyCode::Enter,
         ReedlineEvent::Edit(vec![EditCommand::InsertNewline]),
     );
-
-    // Regular Enter should submit
-    keybindings.add_binding(KeyModifiers::NONE, KeyCode::Enter, ReedlineEvent::Enter);
+    
+    // Keep Ctrl+Enter as backup in case it works
+    keybindings.add_binding(
+        KeyModifiers::CONTROL,
+        KeyCode::Enter,
+        ReedlineEvent::Enter,
+    );
 
     let edit_mode = Box::new(Emacs::new(keybindings));
-
+    
     let mut line_editor = Reedline::create()
         .with_edit_mode(edit_mode)
         .with_validator(Box::new(DefaultValidator))
         .with_completer(Box::new(DefaultCompleter::default()))
         .with_hinter(Box::new(DefaultHinter::default()));
-
+    
     let prompt = ChatPrompt;
-
-    println!("Chat with Claude! Features:");
-    println!("- Type your message and press Enter to send");
-    println!("- Press Shift+Enter to add newlines within your message");
-    println!("- Use standard editing commands (Ctrl+A, Ctrl+E, etc.)");
-    println!("- Use Ctrl+C to exit");
+    
+    println!("Chat with Claude! Intuitive Multiline Input:");
+    println!("- Enter: Send message");
+    println!("- Alt+Enter: Add newlines when needed");  
+    println!("- Copy/paste: Multiline content works perfectly");
+    println!("- Ctrl+C: Exit");
     println!();
 
     loop {
         let sig = line_editor.read_line(&prompt);
-
+        
         match sig {
             Ok(Signal::Success(buffer)) => {
-                let user_message = buffer.trim();
-
+                let user_message = if buffer.contains("\\n") {
+                    // Replace literal \n with actual newlines as a fallback
+                    buffer.replace("\\n", "\n").trim().to_string()
+                } else {
+                    buffer.trim().to_string()
+                };
+                
                 // Skip empty messages
                 if user_message.is_empty() {
                     continue;
                 }
 
                 // Generate HTTP request with the conversation abstraction
-                let http_req = conversation.chat_message(user_message);
+                let http_req = conversation.chat_message(&user_message);
 
                 // Send the request
                 let reqwest_req = http_req
@@ -99,7 +115,7 @@ fn main() -> io::Result<()> {
                     .expect("failed to convert to reqwest request");
 
                 println!("Sending request...");
-
+                
                 let raw = client
                     .execute(reqwest_req)
                     .expect("failed to execute request")
@@ -134,6 +150,6 @@ fn main() -> io::Result<()> {
             }
         }
     }
-
+    
     Ok(())
 }
