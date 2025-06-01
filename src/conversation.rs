@@ -104,6 +104,24 @@ impl Conversation {
     /// The message will automatically be added to the conversation history.
     pub fn user_message<S: Into<String>>(&mut self, api: &Api, user_message: S) -> HttpRequest {
         let message = anthropic::Message::from_text(anthropic::Role::User, user_message);
+        self.build_message(api, message)
+    }
+
+    /// Adds tool results to the conversation and returns an HTTP request to send.
+    ///
+    /// The tool results will be added as a user message to the conversation history.
+    pub fn tool_result(&mut self, api: &Api, tool_result: anthropic::ToolResult) -> HttpRequest {
+        let content = vec![anthropic::Content::ToolResult(tool_result)];
+
+        let message = anthropic::Message {
+            role: anthropic::Role::User,
+            content,
+        };
+        self.build_message(api, message)
+    }
+
+    /// Common logic for building and sending messages.
+    fn build_message(&mut self, api: &Api, message: anthropic::Message) -> HttpRequest {
         self.messages.push_back(message);
 
         let mut builder = crate::MessagesRequestBuilder::new().set_messages(self.messages.clone());
