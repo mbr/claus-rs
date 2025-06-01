@@ -1,9 +1,9 @@
 use std::{env, fs, io};
 
 use reedline::{
-    DefaultCompleter, DefaultHinter, DefaultValidator, EditCommand, Emacs, KeyCode, KeyModifiers,
-    Prompt, PromptEditMode, PromptHistorySearch, Reedline, ReedlineEvent, Signal,
-    default_emacs_keybindings,
+    DefaultCompleter, DefaultHinter, DefaultPrompt, DefaultPromptSegment, DefaultValidator,
+    EditCommand, Emacs, KeyCode, KeyModifiers, Prompt, PromptEditMode, PromptHistorySearch,
+    Reedline, ReedlineEvent, Signal, default_emacs_keybindings,
 };
 
 fn main() -> io::Result<()> {
@@ -40,8 +40,9 @@ fn main() -> io::Result<()> {
         match conversation.handle_response(&raw) {
             Ok(action) => match action {
                 klaus::conversation::Action::HandleAgentMessage(content) => {
-                    for item in content {
-                        println!("Claude: {}", item);
+                    let offset = conversation.history().len() - content.len();
+                    for (idx, item) in content.iter().enumerate() {
+                        println!("[{}] Claude> {}", idx + offset, item);
                     }
                 }
             },
@@ -53,34 +54,6 @@ fn main() -> io::Result<()> {
     }
 
     Ok(())
-}
-
-/// Custom prompt that shows "You: " for single line and "   | " for continuation
-struct ChatPrompt(usize);
-
-impl Prompt for ChatPrompt {
-    fn render_prompt_left(&self) -> std::borrow::Cow<str> {
-        format!("You ({}): ", self.0).into()
-    }
-
-    fn render_prompt_right(&self) -> std::borrow::Cow<str> {
-        "".into()
-    }
-
-    fn render_prompt_indicator(&self, _edit_mode: PromptEditMode) -> std::borrow::Cow<str> {
-        "".into()
-    }
-
-    fn render_prompt_multiline_indicator(&self) -> std::borrow::Cow<str> {
-        "   | ".into()
-    }
-
-    fn render_prompt_history_search_indicator(
-        &self,
-        _history_search: PromptHistorySearch,
-    ) -> std::borrow::Cow<str> {
-        "".into()
-    }
 }
 
 /// Creates a new configured [`Reedline`] instance.
@@ -111,7 +84,10 @@ fn get_user_input(
     conversation: &klaus::conversation::Conversation,
     line_editor: &mut Reedline,
 ) -> Option<String> {
-    let prompt = ChatPrompt(conversation.history().len());
+    let prompt = DefaultPrompt::new(
+        DefaultPromptSegment::Basic(format!("[{}] You", conversation.history().len())),
+        DefaultPromptSegment::CurrentDateTime,
+    );
 
     loop {
         let sig = line_editor.read_line(&prompt);
