@@ -180,6 +180,93 @@ impl Display for ToolUse {
     }
 }
 
+/// A tool result response to a tool use.
+///
+/// Represents the result of executing a tool that was requested by the model.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ToolResult {
+    /// The ID of the tool use this result corresponds to.
+    pub tool_use_id: String,
+    /// The result content.
+    pub content: ToolResultContent,
+    /// Whether this result represents an error.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_error: Option<bool>,
+}
+
+/// Content that can be included in a tool result.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum ToolResultContent {
+    /// Potentially multiple pieces of content.
+    Content(Vec<Content>),
+    /// A single string of content.
+    String(String),
+}
+
+impl Display for ToolResultContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ToolResultContent::Content(contents) => {
+                for (idx, content) in contents.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, " ")?;
+                    }
+                    content.fmt(f)?;
+                }
+                Ok(())
+            }
+            ToolResultContent::String(string) => f.write_str(string),
+        }
+    }
+}
+
+impl From<String> for ToolResultContent {
+    fn from(s: String) -> Self {
+        ToolResultContent::String(s)
+    }
+}
+
+impl From<Vec<Content>> for ToolResultContent {
+    fn from(content: Vec<Content>) -> Self {
+        ToolResultContent::Content(content)
+    }
+}
+
+impl ToolResult {
+    /// Creates a successful tool result.
+    pub fn success<T: Into<ToolResultContent>>(tool_use_id: String, content: T) -> Self {
+        Self {
+            tool_use_id,
+            content: content.into(),
+            is_error: None,
+        }
+    }
+
+    /// Creates an error tool result.
+    pub fn error<T: Into<ToolResultContent>>(tool_use_id: String, error_content: T) -> Self {
+        Self {
+            tool_use_id,
+            content: error_content.into(),
+            is_error: Some(true),
+        }
+    }
+}
+
+impl Display for ToolResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_error == Some(true) {
+            write!(
+                f,
+                "Tool result error for {}: {}",
+                self.tool_use_id, self.content
+            )
+        } else {
+            write!(f, "Tool result for {}: {}", self.tool_use_id, self.content)
+        }
+    }
+}
+
 /// Content pieces that make up a message.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -193,6 +280,8 @@ pub enum Content {
     Image,
     /// Tool use content.
     ToolUse(ToolUse),
+    /// Tool result content.
+    ToolResult(ToolResult),
 }
 
 impl Display for Content {
@@ -201,6 +290,7 @@ impl Display for Content {
             Content::Text { text } => f.write_str(text),
             Content::Image => f.write_str("<image>"),
             Content::ToolUse(tool_use) => tool_use.fmt(f),
+            Content::ToolResult(tool_result) => tool_result.fmt(f),
         }
     }
 }
