@@ -1,10 +1,18 @@
 use std::{env, fs, io};
 
 use reedline::{
-    DefaultCompleter, DefaultHinter, DefaultPrompt, DefaultPromptSegment, DefaultValidator,
-    EditCommand, Emacs, KeyCode, KeyModifiers, Reedline, ReedlineEvent, Signal,
-    default_emacs_keybindings,
+    DefaultPrompt, DefaultPromptSegment, DefaultValidator, EditCommand, Emacs, KeyCode,
+    KeyModifiers, Reedline, ReedlineEvent, Signal, default_emacs_keybindings,
 };
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+/// Input to the web search tool.
+#[derive(Debug, JsonSchema, Serialize, Deserialize)]
+struct WebSearchInput {
+    /// The query to search for.
+    query: String,
+}
 
 fn main() -> io::Result<()> {
     let key_file = env::args()
@@ -21,9 +29,13 @@ fn main() -> io::Result<()> {
 
     // Create a conversation instance
     let mut conversation = klaus::conversation::Conversation::new();
+    conversation.set_system("You are a helpful personal assistant. You are able to answer questions, search the web, and help with tasks.");
+    conversation.add_tool(klaus::anthropic::Tool::new::<WebSearchInput, _, _>(
+        "web_search",
+        "Search the web for information",
+    ));
 
     // Set up reedline with custom keybindings
-
     let mut line_editor = create_editor();
 
     println!("Chat with Claude! Send messages with enter, Alt+Enter for multiline, Ctrl+C to quit");
