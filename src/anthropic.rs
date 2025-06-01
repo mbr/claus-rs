@@ -18,7 +18,7 @@ pub const DEFAULT_ENDPOINT_HOST: &str = "api.anthropic.com";
 pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 
 /// The body of a request to the messages endpoint.
-/// 
+///
 /// This type can be used to construct a [`crate::http_request::HttpRequest`] for the `messages`
 /// endpoint. Usually it is better to use [`crate::MessagesRequestBuilder`] instead.
 #[derive(Debug, Serialize)]
@@ -31,54 +31,39 @@ pub struct MessagesBody<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system: Option<&'a str>,
     /// The messages to include in the request.
+    ///
+    /// Note that `MessagesBody` uses `Arc`s to allow for cheaply copying conversations.
     #[serde(serialize_with = "serialize_arc_vec")]
     pub messages: &'a Vec<Arc<Message>>,
 }
 
 /// A role in a conversation.
 ///
-/// Use [`Role::Other`] to add custom roles.
-#[derive(Clone, Debug)]
+/// The currrent API specification only supports `user` and `assistant` roles.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Role {
+    /// Message from the user.
     User,
+    /// Message from the model.
     Assistant,
-    Other(String),
 }
 
-impl serde::Serialize for Role {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Role::User => serializer.serialize_str("user"),
-            Role::Assistant => serializer.serialize_str("assistant"),
-            Role::Other(s) => serializer.serialize_str(s),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for Role {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        match s.as_str() {
-            "user" => Ok(Role::User),
-            "assistant" => Ok(Role::Assistant),
-            _ => Ok(Role::Other(s)),
-        }
-    }
-}
-
+/// A message in a conversation.
+///
+/// Iterating over a message will yield its `content`.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Message {
+    /// The role of the message.
     pub role: Role,
+    /// The contents of the message.
+    ///
+    /// Messages are allowed to be multipart and can contain mixed inputs.
     pub content: Vec<Content>,
 }
 
 impl Message {
+    /// Convenience function to construct a message containt a single piece of text.
     pub fn from_text<S: Into<String>>(role: Role, text: S) -> Self {
         Self {
             role,
