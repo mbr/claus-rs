@@ -27,7 +27,7 @@ reqwest = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-im.workspace = true
+im = { version = "15.1", features = ["serde"] }
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["blocking"] }
