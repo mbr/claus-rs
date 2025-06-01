@@ -60,7 +60,13 @@ fn create_editor() -> Reedline {
     let mut keybindings = default_emacs_keybindings();
 
     keybindings.add_binding(KeyModifiers::NONE, KeyCode::Enter, ReedlineEvent::Enter);
-    
+
+    // Add Alt+Enter for manual newlines (helps with multiline input)
+    keybindings.add_binding(
+        KeyModifiers::ALT,
+        KeyCode::Enter,
+        ReedlineEvent::Edit(vec![EditCommand::InsertNewline]),
+    );
 
     let edit_mode = Box::new(Emacs::new(keybindings));
     Reedline::create().with_edit_mode(edit_mode)
