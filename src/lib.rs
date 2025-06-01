@@ -229,8 +229,8 @@ where
     let api_response: ApiResponse = serde_json::from_str(json)?;
 
     // Handle API errors explicitly
-    if let ApiResponse::Error { error } = &api_response {
-        return Err(Error::Api(error.clone()));
+    if let ApiResponse::Error { error } = api_response {
+        return Err(Error::Api(error));
     }
 
     // Try conversion, handle failure case
