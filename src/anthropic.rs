@@ -162,6 +162,16 @@ pub enum ApiResponse {
     Error { error: ApiError },
 }
 
+impl ApiResponse {
+    /// Returns a string describing the type of the response.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            ApiResponse::Message(_) => "message",
+            ApiResponse::Error { .. } => "error",
+        }
+    }
+}
+
 impl TryFrom<ApiResponse> for MessagesResponse {
     type Error = ();
 

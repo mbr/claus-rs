@@ -210,33 +210,43 @@ impl MessagesRequestBuilder {
     }
 }
 
-/// A unified error type for all errors that can occur when using the library.
+/// A unified error for responses from the API.
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum ResponseError {
+    /// The given JSON could not be parsed.
     #[error("Deserialization error: {0}")]
     Serde(#[from] serde_json::Error),
+    /// The API returned an explicit error (see [`anthropic::ApiError`]).
     #[error("API error: {0}")]
     Api(#[from] anthropic::ApiError),
+    /// The API returned a response, but it was not the expected type.
     #[error("Unexpected response type")]
-    UnexpectedResponseType,
+    UnexpectedResponseType {
+        expected: &'static str,
+        actual: &'static str,
+    },
 }
 
 /// Deserializes an Anthropic API response from JSON.
-pub fn deserialize_response<T>(json: &str) -> Result<T, Error>
+///
+/// This is the central low-level entry point for parsing responses from the API.
+pub fn deserialize_response<T>(json: &str) -> Result<T, ResponseError>
 where
-    T: TryFrom<ApiResponse>,
+    T: TryFrom<ApiResponse, Error = ()>,
 {
     let api_response: ApiResponse = serde_json::from_str(json)?;
 
-    // Handle API errors explicitly
-    if let ApiResponse::Error { error } = api_response {
-        return Err(Error::Api(error));
-    }
-
-    // Try conversion, handle failure case
-    match T::try_from(api_response) {
-        Ok(response) => Ok(response),
-        Err(_) => Err(Error::UnexpectedResponseType),
+    match api_response {
+        ApiResponse::Error { error } => Err(ResponseError::Api(error)),
+        other => {
+            let kind = other.kind();
+            other
+                .try_into()
+                .map_err(|()| ResponseError::UnexpectedResponseType {
+                    expected: std::any::type_name::<T>(),
+                    actual: kind,
+                })
+        }
     }
 }
 
@@ -260,7 +270,7 @@ mod tests {
         let result: Result<MessagesResponse, _> = deserialize_response(json);
 
         assert!(result.is_err());
-        if let Err(super::Error::Api(api_error)) = result {
+        if let Err(super::ResponseError::Api(api_error)) = result {
             assert!(matches!(api_error, ApiError::NotFoundError));
         } else {
             panic!("Expected Api error");
@@ -280,7 +290,7 @@ mod tests {
         let result: Result<MessagesResponse, _> = deserialize_response(json);
 
         assert!(result.is_err());
-        if let Err(super::Error::Api(api_error)) = result {
+        if let Err(super::ResponseError::Api(api_error)) = result {
             assert!(matches!(api_error, ApiError::InvalidRequestError));
         } else {
             panic!("Expected Api error");

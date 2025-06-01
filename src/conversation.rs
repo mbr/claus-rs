@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::{Api, Error, MessagesRequestBuilder, anthropic, http_request::HttpRequest};
+use crate::{Api, MessagesRequestBuilder, ResponseError, anthropic, http_request::HttpRequest};
 
 /// A conversation that manages message history and generates HTTP requests.
 #[derive(Debug)]
@@ -46,7 +46,7 @@ impl Conversation {
     ///
     /// This method parses the response, adds the assistant's message to the conversation
     /// history, and returns the text content of the response.
-    pub fn handle_response(&mut self, response_json: &str) -> Result<String, Error> {
+    pub fn handle_response(&mut self, response_json: &str) -> Result<String, ResponseError> {
         let response: anthropic::MessagesResponse = crate::deserialize_response(response_json)?;
 
         // Add assistant's message to history
