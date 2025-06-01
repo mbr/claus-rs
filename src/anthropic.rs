@@ -227,6 +227,12 @@ impl From<String> for ToolResultContent {
     }
 }
 
+impl From<&str> for ToolResultContent {
+    fn from(s: &str) -> Self {
+        ToolResultContent::String(s.to_string())
+    }
+}
+
 impl From<Vec<Content>> for ToolResultContent {
     fn from(content: Vec<Content>) -> Self {
         ToolResultContent::Content(content)
@@ -250,6 +256,11 @@ impl ToolResult {
             content: error_content.into(),
             is_error: Some(true),
         }
+    }
+
+    /// Creates an error tool result for an unknown tool.
+    pub fn unknown_tool<S: AsRef<str>>(tool_use_id: String, tool_name: S) -> Self {
+        Self::error(tool_use_id, format!("Unknown tool: {}", tool_name.as_ref()))
     }
 }
 

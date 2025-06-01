@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, env, fs, io};
+use std::{env, fs, io};
 
 use chrono::{DateTime, Utc};
 use klaus::anthropic::{Content, Tool, ToolResult, ToolUse};
@@ -43,7 +43,7 @@ fn main() -> io::Result<()> {
     ));
     conversation.add_tool(Tool::new::<DateTimeInput, _, _>(
         "get_datetime",
-        "Get the current date and time in ISO 8601 format",
+        "Gets the current date and time in ISO 8601 format. Use this tool to get the current date and time. Do not use this tool to get the date and time of a specific event. Use this especially when the user asks for information about the latest of anything, in case you need to make a web search.",
     ));
 
     // Set up reedline with custom keybindings
@@ -51,66 +51,56 @@ fn main() -> io::Result<()> {
 
     println!("Chat with Claude! Send messages with enter, Alt+Enter for multiline, Ctrl+C to quit");
 
-    let mut request_stack = VecDeque::new();
+    let mut pending_request = None;
     loop {
-        let http_req = if let Some(req) = request_stack.pop_front() {
-            req
-        } else {
-            // If we have no request that we need to process buffered, get a new user message.
+        let Some(http_req) = pending_request.take() else {
             let Some(line) = get_user_input(&conversation, &mut line_editor) else {
                 // User requested to quit.
                 break;
             };
-
-            conversation.user_message(&api, &line)
+            pending_request = Some(conversation.user_message(&api, &line));
+            continue;
         };
 
-        // println!("Sending request: {}", http_req);
-
+        // Send the request.
         let raw = client
             .execute(http_req.into())
             .expect("failed to execute request")
             .text()
             .expect("failed to fetch contents");
 
-        match conversation.handle_response(&raw) {
-            Ok(action) => {
-                match action {
-                    klaus::conversation::Action::HandleAgentMessage(contents) => {
-                        let offset = conversation.history().len() - 1;
-                        for (idx, item) in contents.into_iter().enumerate() {
-                            match item {
-                                Content::Text { .. } | Content::Image | Content::ToolResult(_) => {
-                                    println!("[{}.{}] Claude> {}", offset, idx, item);
-                                }
-                                Content::ToolUse(ToolUse { id, name, input }) => {
-                                    println!("[{}.{}] Tool use: {}", offset, idx, name);
-                                    let response = match name.as_str() {
-                                        "web_search" => {
-                                            let input: WebSearchInput =
-                                                serde_json::from_value(input).unwrap();
-                                            "todo".to_string()
-                                        }
-                                        "get_datetime" => tool_get_datetime(),
-                                        _ => {
-                                            // TODO: Return error instead of panicking
-                                            panic!("Unknown tool: {}", name);
-                                        }
-                                    };
-                                    println!("RESPONSE: {}", response);
-                                    request_stack.push_back(
-                                        conversation
-                                            .tool_result(&api, ToolResult::success(id, response)),
-                                    );
-                                }
-                            }
-                        }
+        for (idx, item) in conversation
+            .handle_response(&raw)
+            .expect("failed to handle response")
+            .contents
+            .into_iter()
+            .enumerate()
+        {
+            let mut tool_results = Vec::new();
+            let offset = conversation.history().len() - 1;
+
+            println!("[{}.{}] Claude> {}", offset, idx, item);
+
+            // Once everything has been printed, handle actual tool use.
+            if let Content::ToolUse(ToolUse { id, name, input }) = item {
+                match name.as_str() {
+                    "web_search" => {
+                        tool_results.push(ToolResult::error(
+                            id,
+                            "the web search tool is not implemented",
+                        ));
+                    }
+                    "get_datetime" => {
+                        tool_results.push(ToolResult::success(id, tool_get_datetime()));
+                    }
+                    _ => {
+                        tool_results.push(ToolResult::unknown_tool(id, &name));
                     }
                 }
             }
-            Err(e) => {
-                eprintln!("Error: {:?}", e);
-                break;
+
+            if !tool_results.is_empty() {
+                pending_request = Some(conversation.tool_results(&api, tool_results));
             }
         }
     }

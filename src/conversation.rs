@@ -63,11 +63,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Api, ResponseError, anthropic, anthropic::Message, http_request::HttpRequest};
 
-/// Actions that the caller needs to take based on the API response.
+/// Actions that the caller needs to take based on an API response.
+///
+/// In general the caller should iterate over the content items, optionally showing them to the
+/// user. Any tool uses should be resolved and their results collected.
+///
+/// Once all contents have been processed, if there were any tool uses, the caller must call
+/// [`Conversation::tool_results`] next.
+///
+/// Otherwise the caller is free to send the next user message through
+/// [`Conversation::user_message`].
 #[derive(Debug)]
-pub enum Action {
-    /// Handle a message from the agent/assistant.
-    HandleAgentMessage(Vec<anthropic::Content>),
+pub struct Action {
+    pub contents: Vec<anthropic::Content>,
 }
 
 /// A conversation that manages message history and generates HTTP requests.
@@ -110,8 +118,15 @@ impl Conversation {
     /// Adds tool results to the conversation and returns an HTTP request to send.
     ///
     /// The tool results will be added as a user message to the conversation history.
-    pub fn tool_result(&mut self, api: &Api, tool_result: anthropic::ToolResult) -> HttpRequest {
-        let content = vec![anthropic::Content::ToolResult(tool_result)];
+    pub fn tool_results(
+        &mut self,
+        api: &Api,
+        tool_results: Vec<anthropic::ToolResult>,
+    ) -> HttpRequest {
+        let content = tool_results
+            .into_iter()
+            .map(anthropic::Content::ToolResult)
+            .collect();
 
         let message = anthropic::Message {
             role: anthropic::Role::User,
@@ -137,17 +152,22 @@ impl Conversation {
         builder.build(api)
     }
 
-    /// Handles the response from the API and returns the action to take.
+    /// Handles the response from the API and returns the actions to take.
     ///
     /// This method parses the response, adds the assistant's message to the conversation
-    /// history, and returns the appropriate action for the caller to take.
+    /// history, and returns the appropriate [`Action`] for the caller to take.
+    ///
+    /// Note that the caller must fully handle [`Action`] before calling
+    /// [`Conversation::user_message`] again, see the types documentation for details.
     pub fn handle_response(&mut self, response_json: &str) -> Result<Action, ResponseError> {
         let response: anthropic::MessagesResponse = crate::deserialize_response(response_json)?;
 
         // Add assistant's message to history
         self.messages.push_back(response.message.clone());
 
-        Ok(Action::HandleAgentMessage(response.message.content))
+        Ok(Action {
+            contents: response.message.content,
+        })
     }
 
     /// Serializes the conversation to JSON using the provided writer.
