@@ -66,8 +66,10 @@ let action = conversation.handle_response(&response_json)
     .expect("failed to handle response");
 
 match action {
-    klaus::conversation::Action::HandleAgentMessage(message) => {
-        println!("Assistant: {}", message);
+    klaus::conversation::Action::HandleAgentMessage(content) => {
+        for item in content {
+            println!("Assistant: {}", item);
+        }
     }
 }
 ```

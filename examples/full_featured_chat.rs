@@ -117,8 +117,11 @@ fn main() -> io::Result<()> {
                 // Handle the response and get the assistant's message
                 match conversation.handle_response(&raw) {
                     Ok(action) => match action {
-                        klaus::conversation::Action::HandleAgentMessage(assistant_message) => {
-                            println!("\nClaude: {}\n", assistant_message);
+                        klaus::conversation::Action::HandleAgentMessage(content) => {
+                            println!("\nClaude: ");
+                            for item in content {
+                                println!("{}\n\n", item);
+                            }
                         }
                     },
                     Err(e) => {

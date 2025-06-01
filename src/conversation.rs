@@ -8,7 +8,7 @@ use crate::{Api, ResponseError, anthropic, http_request::HttpRequest};
 #[derive(Debug)]
 pub enum Action {
     /// Handle a message from the agent/assistant.
-    HandleAgentMessage(String),
+    HandleAgentMessage(Vec<anthropic::Content>),
 }
 
 /// A conversation that manages message history and generates HTTP requests.
@@ -59,16 +59,7 @@ impl Conversation {
         // Add assistant's message to history
         self.messages.push(Arc::new(response.message.clone()));
 
-        // Extract and return text content
-        let mut result = String::new();
-        for (i, content) in response.message.content.iter().enumerate() {
-            if i > 0 {
-                result.push('\n');
-            }
-            result.push_str(&content.to_string());
-        }
-
-        Ok(Action::HandleAgentMessage(result))
+        Ok(Action::HandleAgentMessage(response.message.content))
     }
 
     /// Returns the current number of messages in the conversation.

@@ -115,6 +115,14 @@ impl Content {
     pub fn from_text<S: Into<String>>(text: S) -> Self {
         Content::Text { text: text.into() }
     }
+
+    /// Returns the text content of the content piece, if it is a text piece.
+    pub fn as_text(&self) -> Option<&str> {
+        match self {
+            Content::Text { text } => Some(text.as_str()),
+            _ => None,
+        }
+    }
 }
 
 /// Anthropic API error.
