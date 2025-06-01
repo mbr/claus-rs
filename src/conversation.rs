@@ -2,7 +2,14 @@
 
 use std::sync::Arc;
 
-use crate::{Api, MessagesRequestBuilder, ResponseError, anthropic, http_request::HttpRequest};
+use crate::{Api, ResponseError, anthropic, http_request::HttpRequest};
+
+/// Actions that the caller needs to take based on the API response.
+#[derive(Debug)]
+pub enum Action {
+    /// Handle a message from the agent/assistant.
+    HandleAgentMessage(String),
+}
 
 /// A conversation that manages message history and generates HTTP requests.
 #[derive(Debug)]
@@ -33,7 +40,7 @@ impl Conversation {
         self.messages.push(Arc::new(message));
 
         // Build and return HTTP request with full conversation history
-        let mut builder = MessagesRequestBuilder::new().set_messages(self.messages.clone());
+        let mut builder = crate::MessagesRequestBuilder::new().set_messages(self.messages.clone());
 
         if let Some(ref system) = self.system {
             builder = builder.system(system.clone());
@@ -42,11 +49,11 @@ impl Conversation {
         builder.build(api)
     }
 
-    /// Handles the response from the API and returns the assistant's message content.
+    /// Handles the response from the API and returns the action to take.
     ///
     /// This method parses the response, adds the assistant's message to the conversation
-    /// history, and returns the text content of the response.
-    pub fn handle_response(&mut self, response_json: &str) -> Result<String, ResponseError> {
+    /// history, and returns the appropriate action for the caller to take.
+    pub fn handle_response(&mut self, response_json: &str) -> Result<Action, ResponseError> {
         let response: anthropic::MessagesResponse = crate::deserialize_response(response_json)?;
 
         // Add assistant's message to history
@@ -61,7 +68,7 @@ impl Conversation {
             result.push_str(&content.to_string());
         }
 
-        Ok(result)
+        Ok(Action::HandleAgentMessage(result))
     }
 
     /// Returns the current number of messages in the conversation.

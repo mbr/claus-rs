@@ -50,7 +50,7 @@ Calling the Anthropic API means sending the entire conversation every time a req
 
 ## Higher-level: Conversations
 
-To avoid having to manage this kind of state manually, you can use the [`conversation::Conversation`] type:
+For conversation management, you can use the [`conversation::Conversation`] type:
 
 ```rust,no_run
 use klaus::{Api, conversation::Conversation};
@@ -62,6 +62,12 @@ let mut conversation = Conversation::new();
 let http_request = conversation.user_message(&api, "Hello!");
 
 let response_json: String = todo!("send `http_request` and retrieve text response content");
-let assistant_message = conversation.handle_response(&response_json)
+let action = conversation.handle_response(&response_json)
     .expect("failed to handle response");
+
+match action {
+    klaus::conversation::Action::HandleAgentMessage(message) => {
+        println!("Assistant: {}", message);
+    }
+}
 ```
