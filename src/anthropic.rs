@@ -6,8 +6,6 @@ use std::{fmt, fmt::Display, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::Error;
-
 /// API version that is compatible with this module.
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
 
@@ -154,7 +152,7 @@ pub enum ApiError {
 
 /// A response from the Anthropic API.
 ///
-/// This is the "top-level" type for a response from the API.
+/// This is the catch-all type for all valid responses from the API.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ApiResponse {
@@ -172,25 +170,6 @@ impl TryFrom<ApiResponse> for MessagesResponse {
             ApiResponse::Message(response) => Ok(response),
             ApiResponse::Error { error: _ } => Err(()),
         }
-    }
-}
-
-/// Deserializes an Anthropic API response from JSON.
-pub fn deserialize_response<T>(json: &str) -> Result<T, Error>
-where
-    T: TryFrom<ApiResponse>,
-{
-    let api_response: ApiResponse = serde_json::from_str(json)?;
-
-    // Handle API errors explicitly
-    if let ApiResponse::Error { error } = &api_response {
-        return Err(Error::Api(error.clone()));
-    }
-
-    // Try conversion, handle failure case
-    match T::try_from(api_response) {
-        Ok(response) => Ok(response),
-        Err(_) => Err(Error::UnexpectedResponseType),
     }
 }
 

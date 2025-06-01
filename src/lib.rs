@@ -6,7 +6,7 @@ pub mod http_request;
 
 use std::sync::Arc;
 
-use crate::http_request::HttpRequest;
+use crate::{anthropic::ApiResponse, http_request::HttpRequest};
 
 /// An Anthropic API configuration.
 #[derive(Debug)]
@@ -221,9 +221,31 @@ pub enum Error {
     UnexpectedResponseType,
 }
 
+/// Deserializes an Anthropic API response from JSON.
+pub fn deserialize_response<T>(json: &str) -> Result<T, Error>
+where
+    T: TryFrom<ApiResponse>,
+{
+    let api_response: ApiResponse = serde_json::from_str(json)?;
+
+    // Handle API errors explicitly
+    if let ApiResponse::Error { error } = &api_response {
+        return Err(Error::Api(error.clone()));
+    }
+
+    // Try conversion, handle failure case
+    match T::try_from(api_response) {
+        Ok(response) => Ok(response),
+        Err(_) => Err(Error::UnexpectedResponseType),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::anthropic::{ApiError, Content, MessagesResponse, Role, deserialize_response};
+    use super::{
+        anthropic::{ApiError, Content, MessagesResponse, Role},
+        deserialize_response,
+    };
 
     #[test]
     fn test_api_response_error_deserialization() {

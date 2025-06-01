@@ -47,7 +47,7 @@ impl Conversation {
     /// This method parses the response, adds the assistant's message to the conversation
     /// history, and returns the text content of the response.
     pub fn handle_response(&mut self, response_json: &str) -> Result<String, Error> {
-        let response: anthropic::MessagesResponse = anthropic::deserialize_response(response_json)?;
+        let response: anthropic::MessagesResponse = crate::deserialize_response(response_json)?;
 
         // Add assistant's message to history
         self.messages.push(Arc::new(response.message.clone()));

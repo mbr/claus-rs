@@ -17,7 +17,10 @@ use std::{
     sync::Arc,
 };
 
-use klaus::anthropic::{Message, MessagesResponse, Role, deserialize_response};
+use klaus::{
+    anthropic::{Message, MessagesResponse, Role},
+    deserialize_response,
+};
 
 fn main() {
     // Read API from first command line argument, panic if not provided.
