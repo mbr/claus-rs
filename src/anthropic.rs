@@ -90,10 +90,16 @@ impl<'a> IntoIterator for &'a Message {
     }
 }
 
+/// Content pieces that make up a message.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Content {
-    Text { text: String },
+    Text {
+        text: String,
+    },
+    /// Image content.
+    ///
+    /// TODO: At the moment, images are not supported.
     Image,
 }
 
@@ -107,19 +113,15 @@ impl Display for Content {
 }
 
 impl Content {
+    /// Convenience function to construct a text content piece.
     pub fn from_text<S: Into<String>>(text: S) -> Self {
         Content::Text { text: text.into() }
-    }
-
-    pub fn as_text(&self) -> Option<&str> {
-        if let Content::Text { text } = self {
-            return Some(text.as_str());
-        }
-        None
     }
 }
 
 /// Anthropic API error.
+///
+/// Errors defined in the Anthropic API specification, do not include parsing or transport errors.
 #[derive(Clone, Debug, thiserror::Error, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ApiError {
@@ -151,10 +153,14 @@ pub enum ApiError {
 }
 
 /// A response from the Anthropic API.
+///
+/// This is the "top-level" type for a response from the API.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ApiResponse {
+    /// A response to a messages request.
     Message(MessagesResponse),
+    /// An error response from the API.
     Error { error: ApiError },
 }
 
