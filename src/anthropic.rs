@@ -34,6 +34,9 @@ pub struct MessagesBody<'a> {
     ///
     /// Uses [`im::Vector`] for efficient sharing and cloning of conversation history.
     pub messages: &'a im::Vector<Message>,
+    /// Tools available for the model to use.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<&'a im::Vector<Tool>>,
 }
 
 /// A role in a conversation.

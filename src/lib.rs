@@ -100,9 +100,11 @@ pub struct MessagesRequestBuilder {
     system: Option<Arc<str>>,
     /// The messages to send.
     messages: im::Vector<anthropic::Message>,
+    /// Tools available for the model to use.
+    tools: Option<im::Vector<anthropic::Tool>>,
     // Note: Missing: container, mcp_servers, metadata, service_tier,
     //                stop_sequences, stream, temperature, thinking,
-    //                tool_choice, tools, top_k, top_p
+    //                tool_choice, top_k, top_p
 }
 
 impl Default for MessagesRequestBuilder {
@@ -119,6 +121,7 @@ impl MessagesRequestBuilder {
             max_tokens: None,
             system: None,
             messages: im::Vector::new(),
+            tools: None,
         }
     }
 
@@ -170,6 +173,12 @@ impl MessagesRequestBuilder {
         self
     }
 
+    /// Sets the tools available for the model to use.
+    pub fn set_tools<T: Into<im::Vector<anthropic::Tool>>>(mut self, tools: T) -> Self {
+        self.tools = Some(tools.into());
+        self
+    }
+
     /// Builds the HTTP request.
     ///
     /// The resulting [`HttpRequest`] can be sent to the API using a suitable HTTP client.
@@ -202,6 +211,7 @@ impl MessagesRequestBuilder {
                 max_tokens: self.max_tokens.unwrap_or(api.default_max_tokens),
                 system,
                 messages: &self.messages,
+                tools: self.tools.as_ref(),
             };
 
             serde_json::to_string(&body).expect("failed to serialize messages")
