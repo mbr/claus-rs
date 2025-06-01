@@ -253,7 +253,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        anthropic::{ApiError, Content, MessagesResponse, Role},
+        anthropic::{ApiError, Content, MessagesResponse, Role, StopReason},
         deserialize_response,
     };
 
@@ -324,7 +324,7 @@ mod tests {
         assert_eq!(response.id, "msg_013Zva2CMHLNnXjNJJKqJ2EF");
         assert_eq!(response.model, "claude-3-7-sonnet-20250219");
         assert!(matches!(response.message.role, Role::Assistant));
-        assert_eq!(response.stop_reason, "end_turn");
+        assert_eq!(response.stop_reason, StopReason::EndTurn);
         assert_eq!(response.stop_sequence, None);
         assert_eq!(response.usage.input_tokens, 2095);
         assert_eq!(response.usage.output_tokens, 503);

@@ -183,13 +183,43 @@ impl TryFrom<ApiResponse> for MessagesResponse {
     }
 }
 
+/// The reason that the model stopped generating.
+///
+/// See [the Anthropic API documentation](https://docs.anthropic.com/en/api/handling-stop-reasons)
+/// for more information.
+#[derive(Copy, Clone, Debug, Eq, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StopReason {
+    /// The model reached a natural stopping point.
+    EndTurn,
+    /// We exceeded the requested `max_tokens` or the model's maximum.
+    MaxTokens,
+    /// One of the provided custom `stop_sequences` was generated.
+    StopSequence,
+    /// The model invoked one or more tools.
+    ToolUse,
+    /// The model paused its turn.
+    PauseTurn,
+    /// The model refused to provide a response.
+    Refusal,
+}
+
+/// The response to a messages request.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MessagesResponse {
+    /// The ID of the response.
     pub id: String,
+    /// The model used to generate the response.
     pub model: String,
-    pub stop_reason: String,
+    /// The reason the response was stopped.
+    pub stop_reason: StopReason,
+    /// The sequence that caused the response to be stopped.
+    ///
+    /// This will only be set if a custom stop sequence was provided, and it was hit.
     pub stop_sequence: Option<String>,
+    /// The usage statistics for the request.
     pub usage: Usage,
+    // TODO: missing `container`
     #[serde(flatten)]
     pub message: Message,
 }
