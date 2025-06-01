@@ -14,7 +14,6 @@
 use std::{
     env, fs,
     io::{self, Write},
-    sync::Arc,
 };
 
 use klaus::{
@@ -35,9 +34,9 @@ fn main() {
     let api = klaus::Api::new(api_key);
 
     // Messages will hold our conversation, it will include both user messages and model responses.
-    let mut messages = Vec::new();
+    let mut messages = im::Vector::new();
     while let Some(input) = read_next_line() {
-        messages.push(Arc::new(Message::from_text(Role::User, input)));
+        messages.push_back(Message::from_text(Role::User, input));
 
         // Build the request, then send it.
         let http_req = klaus::MessagesRequestBuilder::new()
@@ -57,7 +56,7 @@ fn main() {
             println!("Claude: {}", content);
         }
 
-        messages.push(Arc::new(response.message));
+        messages.push_back(response.message);
     }
 }
 

@@ -8,8 +8,12 @@ use std::sync::Arc;
 
 use crate::{anthropic::ApiResponse, http_request::HttpRequest};
 
-/// An Anthropic API configuration.
-#[derive(Debug)]
+/// A client for the Anthropic API.
+///
+/// The [`Api`] struct holds configuration necessary to make API requests. Create one using
+/// [`Api::new`] with your API key, then use it to build requests with types like
+/// [`MessagesRequestBuilder`].
+#[derive(Clone, Debug)]
 pub struct Api {
     /// The Anthropic API key.
     api_key: Arc<str>,
@@ -22,7 +26,7 @@ pub struct Api {
 }
 
 impl Api {
-    /// Creates a new Anthropic API instance.
+    /// Creates a new [`Api`] client with the given API key.
     ///
     /// Requires a valid Anthropic API key. If you do not have one, you can get one from
     /// [Anthropic's console](https://console.anthropic.com/settings/keys).
@@ -35,7 +39,7 @@ impl Api {
         }
     }
 
-    /// Sets the default model for requests.
+    /// Sets the default model to use for requests.
     ///
     /// If not set, [`anthropic::DEFAULT_MODEL`] will be used.
     pub fn default_model<S: Into<Arc<str>>>(mut self, model: S) -> Self {
@@ -92,7 +96,7 @@ pub struct MessagesRequestBuilder {
     /// The system prompt for the conversation.
     system: Option<String>,
     /// The messages to send.
-    messages: Vec<Arc<anthropic::Message>>,
+    messages: im::Vector<anthropic::Message>,
     // Note: Missing: container, mcp_servers, metadata, service_tier,
     //                stop_sequences, stream, temperature, thinking,
     //                tool_choice, tools, top_k, top_p
@@ -111,7 +115,7 @@ impl MessagesRequestBuilder {
             model: None,
             max_tokens: None,
             system: None,
-            messages: Vec::new(),
+            messages: im::Vector::new(),
         }
     }
 
@@ -144,8 +148,8 @@ impl MessagesRequestBuilder {
     }
 
     /// Appends a message to the request.
-    pub fn push<M: Into<Arc<anthropic::Message>>>(mut self, message: M) -> Self {
-        self.messages.push(message.into());
+    pub fn push(mut self, message: anthropic::Message) -> Self {
+        self.messages.push_back(message);
         self
     }
 
@@ -158,7 +162,7 @@ impl MessagesRequestBuilder {
     }
 
     /// Replace all messages in the request with given messages.
-    pub fn set_messages(mut self, messages: Vec<Arc<anthropic::Message>>) -> Self {
+    pub fn set_messages(mut self, messages: im::Vector<anthropic::Message>) -> Self {
         self.messages = messages;
         self
     }

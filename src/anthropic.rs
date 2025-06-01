@@ -2,7 +2,7 @@
 //!
 //! This module contains types that match the implemented Anthropic API.
 
-use std::{fmt, fmt::Display, sync::Arc};
+use std::{fmt, fmt::Display};
 
 use serde::{Deserialize, Serialize};
 
@@ -30,8 +30,8 @@ pub struct MessagesBody<'a> {
     pub system: Option<&'a str>,
     /// The messages to include in the request.
     ///
-    /// Note that `MessagesBody` uses `Arc`s to allow for cheaply copying conversations.
-    pub messages: &'a Vec<Arc<Message>>,
+    /// Uses [`im::Vector`] for efficient sharing and cloning of conversation history.
+    pub messages: &'a im::Vector<Message>,
 }
 
 /// A role in a conversation.

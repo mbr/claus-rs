@@ -57,7 +57,7 @@
 //! ```
 //!
 
-use std::{io, sync::Arc};
+use std::io;
 
 use serde::{Deserialize, Serialize};
 
@@ -74,7 +74,7 @@ pub enum Action {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Conversation {
     system: Option<String>,
-    messages: Vec<Arc<anthropic::Message>>,
+    messages: im::Vector<anthropic::Message>,
 }
 
 impl Conversation {
@@ -82,7 +82,7 @@ impl Conversation {
     pub fn new() -> Self {
         Self {
             system: None,
-            messages: Vec::new(),
+            messages: im::Vector::new(),
         }
     }
 
@@ -96,7 +96,7 @@ impl Conversation {
     pub fn user_message<S: Into<String>>(&mut self, api: &Api, user_message: S) -> HttpRequest {
         // Add user message to history
         let message = anthropic::Message::from_text(anthropic::Role::User, user_message);
-        self.messages.push(Arc::new(message));
+        self.messages.push_back(message);
 
         // Build and return HTTP request with full conversation history
         let mut builder = crate::MessagesRequestBuilder::new().set_messages(self.messages.clone());
@@ -116,7 +116,7 @@ impl Conversation {
         let response: anthropic::MessagesResponse = crate::deserialize_response(response_json)?;
 
         // Add assistant's message to history
-        self.messages.push(Arc::new(response.message.clone()));
+        self.messages.push_back(response.message.clone());
 
         Ok(Action::HandleAgentMessage(response.message.content))
     }
@@ -138,7 +138,7 @@ impl Conversation {
 
     /// Clears the conversation history.
     pub fn clear(&mut self) {
-        self.messages.clear();
+        self.messages = im::Vector::new();
     }
 }
 
