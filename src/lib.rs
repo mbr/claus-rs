@@ -74,6 +74,11 @@ impl Api {
     }
 }
 
+/// Request builder for the `messages` endpoint.
+///
+/// This builder is used to construct [`HttpRequest`]s for the `messages` endpoint. Once sent,
+/// you should expect to receive a [`crate::anthropic::MessagesResponse`] from the API, see
+/// [`crate::anthropic::deserialize_response`] for details.
 #[derive(Debug)]
 pub struct MessagesRequestBuilder {
     /// The model to use for the request.
@@ -111,18 +116,28 @@ impl MessagesRequestBuilder {
     }
 
     /// Sets the model for the request.
+    ///
+    /// If not set, uses the default model set by [`Api`].
     pub fn model<S: Into<String>>(mut self, model: S) -> Self {
         self.model = Some(model.into());
         self
     }
 
     /// Sets the maximum tokens for the request.
+    ///
+    /// If not set, uses the default max tokens set by [`Api`].
     pub fn max_tokens(mut self, max_tokens: u32) -> Self {
         self.max_tokens = Some(max_tokens);
         self
     }
 
     /// Sets the system prompt for the request.
+    ///
+    /// A system prompt is a message that will always be sent to the model at the beginning of the
+    /// conversation. See [Anthropic's documentation](https://docs.anthropic.com/en/api/system-prompts) for
+    /// more details.
+    ///
+    /// If not set, no system prompt is included in the request.
     pub fn system<S: Into<String>>(mut self, system: S) -> Self {
         self.system = Some(system.into());
         self
@@ -135,6 +150,8 @@ impl MessagesRequestBuilder {
     }
 
     /// Constructs and appends a message to the request.
+    ///
+    /// This is a convenience method to construct a [`Message`] with a single text [`Content`].
     pub fn push_message<S: Into<String>>(self, role: anthropic::Role, text: S) -> Self {
         let message = anthropic::Message::from_text(role, text);
         self.push(message)
@@ -147,6 +164,8 @@ impl MessagesRequestBuilder {
     }
 
     /// Builds the HTTP request.
+    ///
+    /// The resulting [`HttpRequest`] can be sent to the API using a suitable HTTP client.
     pub fn build(&self, api: &Api) -> HttpRequest {
         let mut headers = api.create_default_headers();
 
@@ -191,7 +210,7 @@ impl MessagesRequestBuilder {
     }
 }
 
-/// An Anthropic API error.
+/// A unified error type for all errors that can occur when using the library.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Deserialization error: {0}")]
