@@ -161,6 +161,25 @@ impl Tool {
     }
 }
 
+/// A tool use request from the model.
+///
+/// Represents the model invoking a tool with specific input parameters.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ToolUse {
+    /// Unique identifier for this tool use.
+    pub id: String,
+    /// The name of the tool being invoked.
+    pub name: String,
+    /// The input parameters for the tool.
+    pub input: Value,
+}
+
+impl Display for ToolUse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}({}) with {:?}", self.name, self.id, self.input)
+    }
+}
+
 /// Content pieces that make up a message.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -172,6 +191,8 @@ pub enum Content {
     ///
     /// TODO: At the moment, images are not supported.
     Image,
+    /// Tool use content.
+    ToolUse(ToolUse),
 }
 
 impl Display for Content {
@@ -179,6 +200,7 @@ impl Display for Content {
         match self {
             Content::Text { text } => f.write_str(text),
             Content::Image => f.write_str("<image>"),
+            Content::ToolUse(tool_use) => tool_use.fmt(f),
         }
     }
 }
