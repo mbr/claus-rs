@@ -61,11 +61,7 @@ use std::{io, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    Api, ResponseError,
-    anthropic::{self, deserialize_message_vec, serialize_message_vec},
-    http_request::HttpRequest,
-};
+use crate::{Api, ResponseError, anthropic, http_request::HttpRequest};
 
 /// Actions that the caller needs to take based on the API response.
 #[derive(Debug)]
@@ -78,8 +74,6 @@ pub enum Action {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Conversation {
     system: Option<String>,
-    #[serde(serialize_with = "serialize_message_vec")]
-    #[serde(deserialize_with = "deserialize_message_vec")]
     messages: Vec<Arc<anthropic::Message>>,
 }
 
