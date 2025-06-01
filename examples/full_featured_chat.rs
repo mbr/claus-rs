@@ -46,7 +46,7 @@ fn main() -> io::Result<()> {
     let api = klaus::Api::new(api_key);
 
     // Create a conversation instance
-    let mut conversation = klaus::conversation::Conversation::new(api);
+    let mut conversation = klaus::conversation::Conversation::new();
 
     // Set up reedline with custom keybindings
     let mut keybindings = default_emacs_keybindings();
@@ -99,7 +99,7 @@ fn main() -> io::Result<()> {
                 }
 
                 // Generate HTTP request with the conversation abstraction
-                let http_req = conversation.chat_message(&user_message);
+                let http_req = conversation.chat_message(&api, &user_message);
 
                 // Send the request
                 let reqwest_req = http_req

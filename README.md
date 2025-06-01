@@ -56,10 +56,10 @@ For conversation management, you can use the [`conversation::Conversation`] type
 use klaus::{Api, conversation::Conversation};
 
 let api = Api::new("sk-ant-api03-...");
-let mut conversation = Conversation::new(api);
+let mut conversation = Conversation::new();
 
 // Generate request for user message
-let http_request = conversation.chat_message("Hello!");
+let http_request = conversation.chat_message(&api, "Hello!");
 
 // After sending the request and receiving response JSON:
 // let assistant_message = conversation.handle_response(&response_json)?;

@@ -7,16 +7,14 @@ use crate::{Api, Error, MessagesRequestBuilder, anthropic, http_request::HttpReq
 /// A conversation that manages message history and generates HTTP requests.
 #[derive(Debug)]
 pub struct Conversation {
-    api: Api,
     system: Option<String>,
     messages: Vec<Arc<anthropic::Message>>,
 }
 
 impl Conversation {
-    /// Creates a new conversation with the given API configuration.
-    pub fn new(api: Api) -> Self {
+    /// Creates a new conversation.
+    pub fn new() -> Self {
         Self {
-            api,
             system: None,
             messages: Vec::new(),
         }
@@ -29,7 +27,7 @@ impl Conversation {
     }
 
     /// Adds a user message and returns an HTTP request to send.
-    pub fn chat_message<S: Into<String>>(&mut self, user_message: S) -> HttpRequest {
+    pub fn chat_message<S: Into<String>>(&mut self, api: &Api, user_message: S) -> HttpRequest {
         // Add user message to history
         let message = anthropic::Message::from_text(anthropic::Role::User, user_message);
         self.messages.push(Arc::new(message));
@@ -41,7 +39,7 @@ impl Conversation {
             builder = builder.system(system.clone());
         }
 
-        builder.build(&self.api)
+        builder.build(api)
     }
 
     /// Handles the response from the API and returns the assistant's message content.
@@ -74,5 +72,11 @@ impl Conversation {
     /// Clears the conversation history.
     pub fn clear(&mut self) {
         self.messages.clear();
+    }
+}
+
+impl Default for Conversation {
+    fn default() -> Self {
+        Self::new()
     }
 }
