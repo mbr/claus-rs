@@ -17,16 +17,27 @@ pub const DEFAULT_ENDPOINT_HOST: &str = "api.anthropic.com";
 /// Default model to use for requests.
 pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 
+/// The body of a request to the messages endpoint.
+/// 
+/// This type can be used to construct a [`crate::http_request::HttpRequest`] for the `messages`
+/// endpoint. Usually it is better to use [`crate::MessagesRequestBuilder`] instead.
 #[derive(Debug, Serialize)]
 pub struct MessagesBody<'a> {
+    /// The model to use for the request.
     pub model: &'a str,
+    /// The maximum number of tokens for the response.
     pub max_tokens: u32,
+    /// The system prompt for the conversation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system: Option<&'a str>,
+    /// The messages to include in the request.
     #[serde(serialize_with = "serialize_arc_vec")]
     pub messages: &'a Vec<Arc<Message>>,
 }
 
+/// A role in a conversation.
+///
+/// Use [`Role::Other`] to add custom roles.
 #[derive(Clone, Debug)]
 pub enum Role {
     User,
