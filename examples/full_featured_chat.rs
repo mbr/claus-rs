@@ -1,8 +1,9 @@
 use std::{env, fs, io};
 
 use reedline::{
-    DefaultPrompt, DefaultPromptSegment, EditCommand, Emacs, KeyCode, KeyModifiers, Reedline,
-    ReedlineEvent, Signal, default_emacs_keybindings,
+    DefaultCompleter, DefaultHinter, DefaultPrompt, DefaultPromptSegment, DefaultValidator,
+    EditCommand, Emacs, KeyCode, KeyModifiers, Reedline, ReedlineEvent, Signal,
+    default_emacs_keybindings,
 };
 
 fn main() -> io::Result<()> {
@@ -69,7 +70,11 @@ fn create_editor() -> Reedline {
     );
 
     let edit_mode = Box::new(Emacs::new(keybindings));
-    Reedline::create().with_edit_mode(edit_mode)
+
+    Reedline::create()
+        .with_edit_mode(edit_mode)
+        // Note: We need a validator to support multiline input.
+        .with_validator(Box::new(DefaultValidator))
 }
 
 /// Returns the next user input, returning `None` if the program should exit.
