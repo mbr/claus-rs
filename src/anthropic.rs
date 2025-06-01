@@ -4,6 +4,7 @@
 
 use std::{fmt, fmt::Display};
 
+use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -110,12 +111,19 @@ pub struct Tool {
 }
 
 impl Tool {
-    /// Creates a new tool with the given name, description, and input schema.
-    pub fn new<N, D>(name: N, description: D, input_schema: Value) -> Self
+    /// Creates a new tool with the given name and description.
+    ///
+    /// The input schema is automatically generated from the type parameter T.
+    pub fn new<T, N, D>(name: N, description: D) -> Self
     where
+        T: JsonSchema,
         N: Into<String>,
         D: Into<String>,
     {
+        let schema = schema_for!(T);
+        let input_schema =
+            serde_json::to_value(schema).expect("Schema serialization should not fail");
+
         Self {
             name: name.into(),
             description: description.into(),
