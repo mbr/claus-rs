@@ -1,9 +1,8 @@
 use std::{env, fs, io};
 
 use reedline::{
-    DefaultCompleter, DefaultHinter, DefaultPrompt, DefaultPromptSegment, DefaultValidator,
-    EditCommand, Emacs, KeyCode, KeyModifiers, Prompt, PromptEditMode, PromptHistorySearch,
-    Reedline, ReedlineEvent, Signal, default_emacs_keybindings,
+    DefaultPrompt, DefaultPromptSegment, EditCommand, Emacs, KeyCode, KeyModifiers, Reedline,
+    ReedlineEvent, Signal, default_emacs_keybindings,
 };
 
 fn main() -> io::Result<()> {
@@ -60,23 +59,11 @@ fn main() -> io::Result<()> {
 fn create_editor() -> Reedline {
     let mut keybindings = default_emacs_keybindings();
 
-    // Regular Enter sends the message (standard chat behavior)
     keybindings.add_binding(KeyModifiers::NONE, KeyCode::Enter, ReedlineEvent::Enter);
-
-    // Alt+Enter adds newlines when you specifically want them
-    keybindings.add_binding(
-        KeyModifiers::ALT,
-        KeyCode::Enter,
-        ReedlineEvent::Edit(vec![EditCommand::InsertNewline]),
-    );
+    
 
     let edit_mode = Box::new(Emacs::new(keybindings));
-
-    Reedline::create()
-        .with_edit_mode(edit_mode)
-        .with_validator(Box::new(DefaultValidator))
-        .with_completer(Box::new(DefaultCompleter::default()))
-        .with_hinter(Box::new(DefaultHinter::default()))
+    Reedline::create().with_edit_mode(edit_mode)
 }
 
 /// Returns the next user input, returning `None` if the program should exit.
