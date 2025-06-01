@@ -1,4 +1,30 @@
 //! Conversation management for ongoing chats with the API.
+//!
+//! To interact, a caller creates a conversation, then calls [`Conversation::user_message`] to
+//! obtain a message it is expected to send to the API.
+//!
+//! Once a response to this message is received, the caller should call
+//! [`Conversation::handle_response`] to handle the response from the API.
+//!
+//! Calls to [`Conversation::handle_response`] will return an [`Action`], which the caller must
+//! process (see [`Action`] for more details).
+//!
+//! ## State management
+//!
+//! Every conversation holds a series of messages and some configuration, since the Anthropic API
+//! does not persist any state remotely. For one, this means that any number of conversations can
+//! be created and managed in parallel, using the same [`Api`] instance.
+//!
+//! To persist the state of a conversation the [`Conversation`] itself can be serialized and
+//! deserialized using [`serde`]. Additionally the convenience [`Conversation::to_json`] and
+//! [`Conversation::from_json`] methods can be used.
+//!
+//! ## Example
+//!
+//! ```
+//!
+//! ```
+//!
 
 use std::sync::Arc;
 
