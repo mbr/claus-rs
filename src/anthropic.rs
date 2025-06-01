@@ -5,6 +5,7 @@
 use std::{fmt, fmt::Display};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// API version that is compatible with this module.
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -84,6 +85,42 @@ impl<'a> IntoIterator for &'a Message {
 
     fn into_iter(self) -> Self::IntoIter {
         self.content.iter()
+    }
+}
+
+/// A tool that can be used by the model.
+///
+/// Tools allow the model to perform actions beyond text generation, such as calling functions
+/// or retrieving external data.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Tool {
+    /// The name of the tool.
+    ///
+    /// Must be a valid identifier that can be referenced by the model.
+    pub name: String,
+    /// A description of what the tool does.
+    ///
+    /// This helps the model understand when and how to use the tool.
+    pub description: String,
+    /// JSON schema defining the tool's input parameters.
+    ///
+    /// This schema describes the structure and types of the parameters
+    /// that the tool expects to receive.
+    pub input_schema: Value,
+}
+
+impl Tool {
+    /// Creates a new tool with the given name, description, and input schema.
+    pub fn new<N, D>(name: N, description: D, input_schema: Value) -> Self
+    where
+        N: Into<String>,
+        D: Into<String>,
+    {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            input_schema,
+        }
     }
 }
 
