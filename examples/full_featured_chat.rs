@@ -99,7 +99,7 @@ fn main() -> io::Result<()> {
                 }
 
                 // Generate HTTP request with the conversation abstraction
-                let http_req = conversation.chat_message(&api, &user_message);
+                let http_req = conversation.user_message(&api, &user_message);
 
                 // Send the request
                 let reqwest_req = http_req

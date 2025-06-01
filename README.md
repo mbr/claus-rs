@@ -59,7 +59,7 @@ let api = Api::new("sk-ant-api03-...");
 let mut conversation = Conversation::new();
 
 // Generate request for user message
-let http_request = conversation.chat_message(&api, "Hello!");
+let http_request = conversation.user_message(&api, "Hello!");
 
 // After sending the request and receiving response JSON:
 // let assistant_message = conversation.handle_response(&response_json)?;

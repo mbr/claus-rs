@@ -27,7 +27,7 @@ impl Conversation {
     }
 
     /// Adds a user message and returns an HTTP request to send.
-    pub fn chat_message<S: Into<String>>(&mut self, api: &Api, user_message: S) -> HttpRequest {
+    pub fn user_message<S: Into<String>>(&mut self, api: &Api, user_message: S) -> HttpRequest {
         // Add user message to history
         let message = anthropic::Message::from_text(anthropic::Role::User, user_message);
         self.messages.push(Arc::new(message));
