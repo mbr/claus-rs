@@ -21,14 +21,51 @@
 //!
 //! ## Example
 //!
-//! ```
+//! ```no_run
+//! use klaus::{Api, conversation::Conversation};
 //!
+//! let api = Api::new("sk-ant-api03-...");
+//! let mut conversation = Conversation::new();
+//!
+//! // Set a system prompt
+//! conversation.set_system("You are a helpful assistant.");
+//!
+//! // Send a user message
+//! let http_request = conversation.user_message(&api, "Hello!");
+//!
+//! // ... send http_request and get response_json ...
+//! # let response_json = r#"{"type":"message","id":"msg_123","model":"claude-sonnet-4-20250514","stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":5},"role":"assistant","content":[{"type":"text","text":"Hello!"}]}"#;
+//!
+//! // Handle the response
+//! match conversation.handle_response(response_json) {
+//!     Ok(action) => match action {
+//!         klaus::conversation::Action::HandleAgentMessage(content) => {
+//!             for item in content {
+//!                 println!("Assistant: {}", item);
+//!             }
+//!         }
+//!     },
+//!     Err(e) => eprintln!("Error: {}", e),
+//! }
+//!
+//! // Save conversation state
+//! let mut buffer = Vec::new();
+//! conversation.to_json(&mut buffer).unwrap();
+//!
+//! // Later, restore conversation state
+//! let restored_conversation = Conversation::from_json(&buffer[..]).unwrap();
 //! ```
 //!
 
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
-use crate::{Api, ResponseError, anthropic, http_request::HttpRequest};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    Api, ResponseError,
+    anthropic::{self, deserialize_message_vec, serialize_message_vec},
+    http_request::HttpRequest,
+};
 
 /// Actions that the caller needs to take based on the API response.
 #[derive(Debug)]
@@ -38,9 +75,11 @@ pub enum Action {
 }
 
 /// A conversation that manages message history and generates HTTP requests.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Conversation {
     system: Option<String>,
+    #[serde(serialize_with = "serialize_message_vec")]
+    #[serde(deserialize_with = "deserialize_message_vec")]
     messages: Vec<Arc<anthropic::Message>>,
 }
 
@@ -86,6 +125,16 @@ impl Conversation {
         self.messages.push(Arc::new(response.message.clone()));
 
         Ok(Action::HandleAgentMessage(response.message.content))
+    }
+
+    /// Serializes the conversation to JSON using the provided writer.
+    pub fn to_json<W: io::Write>(&self, writer: W) -> Result<(), serde_json::Error> {
+        serde_json::to_writer(writer, self)
+    }
+
+    /// Deserializes a conversation from JSON using the provided reader.
+    pub fn from_json<R: io::Read>(reader: R) -> Result<Self, serde_json::Error> {
+        serde_json::from_reader(reader)
     }
 
     /// Returns the current number of messages in the conversation.

@@ -38,7 +38,7 @@ pub struct MessagesBody<'a> {
 /// A role in a conversation.
 ///
 /// The currrent API specification only supports `user` and `assistant` roles.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     /// Message from the user.
@@ -242,7 +242,7 @@ pub struct Usage {
 }
 
 /// Helper function to serialize a vector of messages.
-fn serialize_message_vec<S>(messages: &Vec<Arc<Message>>, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize_message_vec<S>(messages: &[Arc<Message>], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -252,4 +252,13 @@ where
         seq.serialize_element(&**message)?;
     }
     seq.end()
+}
+
+/// Helper function to deserialize a vector of messages.
+pub fn deserialize_message_vec<'de, D>(deserializer: D) -> Result<Vec<Arc<Message>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let messages: Vec<Message> = Vec::deserialize(deserializer)?;
+    Ok(messages.into_iter().map(Arc::new).collect())
 }
