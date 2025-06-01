@@ -77,14 +77,14 @@ fn main() -> io::Result<()> {
             Ok(action) => {
                 match action {
                     klaus::conversation::Action::HandleAgentMessage(contents) => {
-                        let offset = conversation.history().len() - contents.len();
+                        let offset = conversation.history().len() - 1;
                         for (idx, item) in contents.into_iter().enumerate() {
                             match item {
                                 Content::Text { .. } | Content::Image | Content::ToolResult(_) => {
-                                    println!("[{}] Claude> {}", idx + offset, item);
+                                    println!("[{}.{}] Claude> {}", offset, idx, item);
                                 }
                                 Content::ToolUse(ToolUse { id, name, input }) => {
-                                    println!("[{}] Tool use: {}", idx + offset, name);
+                                    println!("[{}.{}] Tool use: {}", offset, idx, name);
                                     let response = match name.as_str() {
                                         "web_search" => {
                                             let input: WebSearchInput =
