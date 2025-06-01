@@ -61,7 +61,7 @@ use std::{io, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Api, ResponseError, anthropic, http_request::HttpRequest};
+use crate::{Api, ResponseError, anthropic, anthropic::Message, http_request::HttpRequest};
 
 /// Actions that the caller needs to take based on the API response.
 #[derive(Debug)]
@@ -97,12 +97,12 @@ impl Conversation {
     }
 
     /// Adds a user message and returns an HTTP request to send.
+    ///
+    /// The message will automatically be added to the conversation history.
     pub fn user_message<S: Into<String>>(&mut self, api: &Api, user_message: S) -> HttpRequest {
-        // Add user message to history
         let message = anthropic::Message::from_text(anthropic::Role::User, user_message);
         self.messages.push_back(message);
 
-        // Build and return HTTP request with full conversation history
         let mut builder = crate::MessagesRequestBuilder::new().set_messages(self.messages.clone());
 
         if let Some(ref system) = self.system {
@@ -135,14 +135,14 @@ impl Conversation {
         serde_json::from_reader(reader)
     }
 
-    /// Returns the current number of messages in the conversation.
-    pub fn message_count(&self) -> usize {
-        self.messages.len()
-    }
-
     /// Clears the conversation history.
     pub fn clear(&mut self) {
         self.messages = im::Vector::new();
+    }
+
+    /// Returns the message history.
+    pub fn history(&self) -> &im::Vector<Message> {
+        &self.messages
     }
 }
 

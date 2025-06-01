@@ -6,12 +6,61 @@ use reedline::{
     default_emacs_keybindings,
 };
 
-// Custom prompt that shows "You: " for single line and "   | " for continuation
-struct ChatPrompt;
+fn main() -> io::Result<()> {
+    let key_file = env::args()
+        .skip(1)
+        .next()
+        .expect("requires argument: anthropic api key file");
+
+    // Setup API.
+    let api_key = fs::read_to_string(key_file).expect("failed to read key");
+    let api = klaus::Api::new(api_key);
+
+    // Setup HTTP client.
+    let client = reqwest::blocking::Client::new();
+
+    // Create a conversation instance
+    let mut conversation = klaus::conversation::Conversation::new();
+
+    // Set up reedline with custom keybindings
+
+    let mut line_editor = create_editor();
+
+    println!("Chat with Claude! Send messages with enter, Alt+Enter for multiline, Ctrl+C to quit");
+
+    while let Some(line) = get_user_input(&conversation, &mut line_editor) {
+        let http_req = conversation.user_message(&api, &line);
+
+        let raw = client
+            .execute(http_req.into())
+            .expect("failed to execute request")
+            .text()
+            .expect("failed to fetch contents");
+
+        match conversation.handle_response(&raw) {
+            Ok(action) => match action {
+                klaus::conversation::Action::HandleAgentMessage(content) => {
+                    for item in content {
+                        println!("Claude: {}", item);
+                    }
+                }
+            },
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                break;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Custom prompt that shows "You: " for single line and "   | " for continuation
+struct ChatPrompt(usize);
 
 impl Prompt for ChatPrompt {
     fn render_prompt_left(&self) -> std::borrow::Cow<str> {
-        "You: ".into()
+        format!("You ({}): ", self.0).into()
     }
 
     fn render_prompt_right(&self) -> std::borrow::Cow<str> {
@@ -34,21 +83,8 @@ impl Prompt for ChatPrompt {
     }
 }
 
-fn main() -> io::Result<()> {
-    let key_file = env::args()
-        .skip(1)
-        .next()
-        .expect("requires argument: anthropic api key file");
-
-    let client = reqwest::blocking::Client::new();
-
-    let api_key = fs::read_to_string(key_file).expect("failed to read key");
-    let api = klaus::Api::new(api_key);
-
-    // Create a conversation instance
-    let mut conversation = klaus::conversation::Conversation::new();
-
-    // Set up reedline with custom keybindings
+/// Creates a new configured [`Reedline`] instance.
+fn create_editor() -> Reedline {
     let mut keybindings = default_emacs_keybindings();
 
     // Regular Enter sends the message (standard chat behavior)
@@ -61,92 +97,41 @@ fn main() -> io::Result<()> {
         ReedlineEvent::Edit(vec![EditCommand::InsertNewline]),
     );
 
-    // Keep Ctrl+Enter as backup in case it works
-    keybindings.add_binding(KeyModifiers::CONTROL, KeyCode::Enter, ReedlineEvent::Enter);
-
     let edit_mode = Box::new(Emacs::new(keybindings));
 
-    let mut line_editor = Reedline::create()
+    Reedline::create()
         .with_edit_mode(edit_mode)
         .with_validator(Box::new(DefaultValidator))
         .with_completer(Box::new(DefaultCompleter::default()))
-        .with_hinter(Box::new(DefaultHinter::default()));
+        .with_hinter(Box::new(DefaultHinter::default()))
+}
 
-    let prompt = ChatPrompt;
-
-    println!("Chat with Claude! Intuitive Multiline Input:");
-    println!("- Enter: Send message");
-    println!("- Alt+Enter: Add newlines when needed");
-    println!("- Copy/paste: Multiline content works perfectly");
-    println!("- Ctrl+C: Exit");
-    println!();
+/// Returns the next user input, returning `None` if the program should exit.
+fn get_user_input(
+    conversation: &klaus::conversation::Conversation,
+    line_editor: &mut Reedline,
+) -> Option<String> {
+    let prompt = ChatPrompt(conversation.history().len());
 
     loop {
         let sig = line_editor.read_line(&prompt);
-
         match sig {
             Ok(Signal::Success(buffer)) => {
-                let user_message = if buffer.contains("\\n") {
-                    // Replace literal \n with actual newlines as a fallback
-                    buffer.replace("\\n", "\n").trim().to_string()
-                } else {
-                    buffer.trim().to_string()
-                };
+                let user_message = buffer.trim();
 
-                // Skip empty messages
                 if user_message.is_empty() {
                     continue;
                 }
 
-                // Generate HTTP request with the conversation abstraction
-                let http_req = conversation.user_message(&api, &user_message);
-
-                // Send the request
-                let reqwest_req = http_req
-                    .try_into_reqwest_blocking()
-                    .expect("failed to convert to reqwest request");
-
-                println!("Sending request...");
-
-                let raw = client
-                    .execute(reqwest_req)
-                    .expect("failed to execute request")
-                    .text()
-                    .expect("failed to fetch contents");
-
-                // Handle the response and get the assistant's message
-                match conversation.handle_response(&raw) {
-                    Ok(action) => match action {
-                        klaus::conversation::Action::HandleAgentMessage(content) => {
-                            println!("\nClaude: ");
-                            for item in content {
-                                println!("{}\n\n", item);
-                            }
-                        }
-                    },
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        break;
-                    }
-                }
-
-                println!("Messages in conversation: {}", conversation.message_count());
-                println!();
+                return Some(user_message.to_owned());
             }
-            Ok(Signal::CtrlC) => {
-                println!("Goodbye!");
-                break;
-            }
-            Ok(Signal::CtrlD) => {
-                println!("Goodbye!");
-                break;
+            Ok(Signal::CtrlC) | Ok(Signal::CtrlD) => {
+                return None;
             }
             Err(err) => {
                 eprintln!("Error: {}", err);
-                break;
+                return None;
             }
         }
     }
-
-    Ok(())
 }
