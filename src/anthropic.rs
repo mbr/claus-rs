@@ -93,6 +93,32 @@ impl<'a> IntoIterator for &'a Message {
 ///
 /// Tools allow the model to perform actions beyond text generation, such as calling functions
 /// or retrieving external data.
+///
+/// # Example
+///
+/// ```
+/// use klaus::anthropic::Tool;
+/// use schemars::JsonSchema;
+/// use serde_json;
+///
+/// #[derive(JsonSchema)]
+/// struct GetStockPriceInput {
+///     /// The stock ticker symbol, e.g. AAPL for Apple Inc.
+///     ticker: String,
+/// }
+///
+/// let tool = Tool::new::<GetStockPriceInput, _, _>(
+///     "get_stock_price",
+///     "Get the current stock price for a given ticker symbol.",
+/// );
+///# let serialized = serde_json::to_value(&tool).expect("Should serialize");
+///#
+///# assert_eq!(serialized["name"], "get_stock_price");
+///# assert_eq!(serialized["description"], "Get the current stock price for a given ticker symbol.");
+///# assert_eq!(serialized["input_schema"]["type"], "object");
+///# assert_eq!(serialized["input_schema"]["properties"]["ticker"]["type"], "string");
+///# assert_eq!(serialized["input_schema"]["required"][0], "ticker");
+/// ```
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Tool {
     /// The name of the tool.
