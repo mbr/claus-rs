@@ -97,7 +97,7 @@ pub struct MessagesRequestBuilder {
     /// If none is provided, the default max tokens will be used.
     max_tokens: Option<u32>,
     /// The system prompt for the conversation.
-    system: Option<String>,
+    system: Option<Arc<str>>,
     /// The messages to send.
     messages: im::Vector<anthropic::Message>,
     // Note: Missing: container, mcp_servers, metadata, service_tier,
@@ -145,7 +145,7 @@ impl MessagesRequestBuilder {
     /// more details.
     ///
     /// If not set, no system prompt is included in the request.
-    pub fn system<S: Into<String>>(mut self, system: S) -> Self {
+    pub fn system<S: Into<Arc<str>>>(mut self, system: S) -> Self {
         self.system = Some(system.into());
         self
     }

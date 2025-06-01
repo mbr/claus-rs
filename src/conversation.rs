@@ -57,7 +57,7 @@
 //! ```
 //!
 
-use std::io;
+use std::{io, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
@@ -73,7 +73,9 @@ pub enum Action {
 /// A conversation that manages message history and generates HTTP requests.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Conversation {
-    system: Option<String>,
+    /// The system prompt for the conversation.
+    system: Option<Arc<str>>,
+    /// The conversation's message history.
     messages: im::Vector<anthropic::Message>,
 }
 
@@ -87,7 +89,9 @@ impl Conversation {
     }
 
     /// Sets the system prompt for the conversation.
-    pub fn set_system<S: Into<String>>(&mut self, system: S) -> &mut Self {
+    ///
+    /// By default, the system prompt is not set.
+    pub fn set_system<S: Into<Arc<str>>>(&mut self, system: S) -> &mut Self {
         self.system = Some(system.into());
         self
     }
