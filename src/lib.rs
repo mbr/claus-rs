@@ -376,4 +376,63 @@ mod tests {
         assert!(http_request.body.contains("\"role\":\"user\""));
         assert!(http_request.body.contains("\"text\":\"Hello!\""));
     }
+
+    #[test]
+    fn test_messages_request_builder_with_tools() {
+        use schemars::JsonSchema;
+
+        #[derive(JsonSchema)]
+        #[allow(dead_code)]
+        struct WeatherInput {
+            /// The city and state, e.g. San Francisco, CA
+            location: String,
+            /// Unit for the output - one of (celsius, fahrenheit)
+            unit: Option<String>,
+        }
+
+        let api = super::Api::new("test-api-key");
+
+        // Create a weather tool
+        let weather_tool = super::anthropic::Tool::new::<WeatherInput, _, _>(
+            "get_weather",
+            "Get the current weather in a given location",
+        );
+
+        let tools = im::vector![weather_tool];
+
+        let http_request = super::MessagesRequestBuilder::new()
+            .push_message(
+                super::anthropic::Role::User,
+                "What's the weather in San Francisco?",
+            )
+            .set_tools(tools)
+            .build(&api);
+
+        assert_eq!(http_request.method, "POST");
+        assert_eq!(http_request.path, "/v1/messages");
+        assert_eq!(http_request.host, "api.anthropic.com");
+
+        // Verify the body contains the tools
+        assert!(http_request.body.contains("\"tools\":["));
+        assert!(http_request.body.contains("\"name\":\"get_weather\""));
+        assert!(
+            http_request
+                .body
+                .contains("\"description\":\"Get the current weather in a given location\"")
+        );
+        assert!(http_request.body.contains("\"input_schema\""));
+        assert!(http_request.body.contains("\"properties\""));
+        assert!(http_request.body.contains("\"location\""));
+        assert!(http_request.body.contains("\"unit\""));
+        assert!(http_request.body.contains("\"required\":[\"location\"]"));
+
+        // Verify the message is also present
+        assert!(http_request.body.contains("\"messages\":["));
+        assert!(http_request.body.contains("\"role\":\"user\""));
+        assert!(
+            http_request
+                .body
+                .contains("\"What's the weather in San Francisco?\"")
+        );
+    }
 }
