@@ -1,5 +1,7 @@
-use std::{env, fs, io};
+use std::{collections::VecDeque, env, fs, io};
 
+use chrono::{DateTime, Utc};
+use klaus::anthropic::{Content, Tool, ToolResult, ToolUse};
 use reedline::{
     DefaultPrompt, DefaultPromptSegment, DefaultValidator, EditCommand, Emacs, KeyCode,
     KeyModifiers, Reedline, ReedlineEvent, Signal, default_emacs_keybindings,
@@ -14,6 +16,11 @@ struct WebSearchInput {
     query: String,
 }
 
+/// Input to the datetime tool (empty).
+#[derive(Debug, JsonSchema, Serialize, Deserialize)]
+struct DateTimeInput {}
+// TODO: Make this easier?
+
 fn main() -> io::Result<()> {
     let key_file = env::args()
         .skip(1)
@@ -27,12 +34,16 @@ fn main() -> io::Result<()> {
     // Setup HTTP client.
     let client = reqwest::blocking::Client::new();
 
-    // Create a conversation instance
+    // Create the conversation instance.
     let mut conversation = klaus::conversation::Conversation::new();
     conversation.set_system("You are a helpful personal assistant. You are able to answer questions, search the web, and help with tasks.");
-    conversation.add_tool(klaus::anthropic::Tool::new::<WebSearchInput, _, _>(
+    conversation.add_tool(Tool::new::<WebSearchInput, _, _>(
         "web_search",
         "Search the web for information",
+    ));
+    conversation.add_tool(Tool::new::<DateTimeInput, _, _>(
+        "get_datetime",
+        "Get the current date and time in ISO 8601 format",
     ));
 
     // Set up reedline with custom keybindings
@@ -40,8 +51,21 @@ fn main() -> io::Result<()> {
 
     println!("Chat with Claude! Send messages with enter, Alt+Enter for multiline, Ctrl+C to quit");
 
-    while let Some(line) = get_user_input(&conversation, &mut line_editor) {
-        let http_req = conversation.user_message(&api, &line);
+    let mut request_stack = VecDeque::new();
+    loop {
+        let http_req = if let Some(req) = request_stack.pop_front() {
+            req
+        } else {
+            // If we have no request that we need to process buffered, get a new user message.
+            let Some(line) = get_user_input(&conversation, &mut line_editor) else {
+                // User requested to quit.
+                break;
+            };
+
+            conversation.user_message(&api, &line)
+        };
+
+        // println!("Sending request: {}", http_req);
 
         let raw = client
             .execute(http_req.into())
@@ -50,22 +74,54 @@ fn main() -> io::Result<()> {
             .expect("failed to fetch contents");
 
         match conversation.handle_response(&raw) {
-            Ok(action) => match action {
-                klaus::conversation::Action::HandleAgentMessage(content) => {
-                    let offset = conversation.history().len() - content.len();
-                    for (idx, item) in content.iter().enumerate() {
-                        println!("[{}] Claude> {}", idx + offset, item);
+            Ok(action) => {
+                match action {
+                    klaus::conversation::Action::HandleAgentMessage(contents) => {
+                        let offset = conversation.history().len() - contents.len();
+                        for (idx, item) in contents.into_iter().enumerate() {
+                            match item {
+                                Content::Text { .. } | Content::Image | Content::ToolResult(_) => {
+                                    println!("[{}] Claude> {}", idx + offset, item);
+                                }
+                                Content::ToolUse(ToolUse { id, name, input }) => {
+                                    println!("[{}] Tool use: {}", idx + offset, name);
+                                    let response = match name.as_str() {
+                                        "web_search" => {
+                                            let input: WebSearchInput =
+                                                serde_json::from_value(input).unwrap();
+                                            "todo".to_string()
+                                        }
+                                        "get_datetime" => tool_get_datetime(),
+                                        _ => {
+                                            // TODO: Return error instead of panicking
+                                            panic!("Unknown tool: {}", name);
+                                        }
+                                    };
+                                    println!("RESPONSE: {}", response);
+                                    request_stack.push_back(
+                                        conversation
+                                            .tool_result(&api, ToolResult::success(id, response)),
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
-            },
+            }
             Err(e) => {
-                eprintln!("Error: {}", e);
+                eprintln!("Error: {:?}", e);
                 break;
             }
         }
     }
 
     Ok(())
+}
+
+/// Tool that returns the current date and time in ISO 8601 format.
+fn tool_get_datetime() -> String {
+    let now: DateTime<Utc> = Utc::now();
+    now.to_rfc3339()
 }
 
 /// Creates a new configured [`Reedline`] instance.
