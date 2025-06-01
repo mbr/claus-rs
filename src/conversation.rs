@@ -77,6 +77,8 @@ pub struct Conversation {
     system: Option<Arc<str>>,
     /// The conversation's message history.
     messages: im::Vector<anthropic::Message>,
+    /// Tools available for the model to use.
+    tools: im::Vector<anthropic::Tool>,
 }
 
 impl Conversation {
@@ -85,6 +87,7 @@ impl Conversation {
         Self {
             system: None,
             messages: im::Vector::new(),
+            tools: im::Vector::new(),
         }
     }
 
@@ -107,6 +110,10 @@ impl Conversation {
 
         if let Some(ref system) = self.system {
             builder = builder.system(system.clone());
+        }
+
+        if !self.tools.is_empty() {
+            builder = builder.set_tools(self.tools.clone());
         }
 
         builder.build(api)
@@ -144,10 +151,71 @@ impl Conversation {
     pub fn history(&self) -> &im::Vector<Message> {
         &self.messages
     }
+
+    /// Adds a tool to the conversation.
+    ///
+    /// Tools are available to the model and will be included in all subsequent requests.
+    pub fn add_tool(&mut self, tool: anthropic::Tool) -> &mut Self {
+        self.tools.push_back(tool);
+        self
+    }
+
+    /// Sets the tools for the conversation.
+    ///
+    /// This replaces any existing tools with the provided ones.
+    pub fn set_tools<T: Into<im::Vector<anthropic::Tool>>>(&mut self, tools: T) -> &mut Self {
+        self.tools = tools.into();
+        self
+    }
 }
 
 impl Default for Conversation {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use schemars::JsonSchema;
+
+    use crate::conversation::Conversation;
+
+    #[derive(JsonSchema)]
+    #[allow(dead_code)]
+    struct TestToolInput {
+        /// A test parameter
+        param: String,
+    }
+
+    #[test]
+    fn test_conversation_with_tools() {
+        let api = crate::Api::new("test-api-key");
+        let mut conversation = Conversation::new();
+
+        // Create a test tool
+        let test_tool = crate::anthropic::Tool::new::<TestToolInput, _, _>(
+            "test_tool",
+            "A test tool for testing",
+        );
+
+        // Add the tool to the conversation
+        conversation.add_tool(test_tool);
+
+        // Create a user message request
+        let http_request = conversation.user_message(&api, "Hello, use the tool!");
+
+        // Verify the request includes tools
+        assert!(http_request.body.contains("\"tools\":["));
+        assert!(http_request.body.contains("\"name\":\"test_tool\""));
+        assert!(
+            http_request
+                .body
+                .contains("\"description\":\"A test tool for testing\"")
+        );
+
+        // Verify the message is also present
+        assert!(http_request.body.contains("\"messages\":["));
+        assert!(http_request.body.contains("\"Hello, use the tool!\""));
     }
 }
