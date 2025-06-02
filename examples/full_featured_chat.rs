@@ -144,16 +144,20 @@ fn tool_get_datetime() -> String {
 
 /// Performs a web search using the Brave Search API.
 fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult>, String> {
-    /// Internal response structure for Brave Search API.
     #[derive(Debug, Deserialize)]
-    struct BraveSearchResponse {
-        web: Option<Vec<BraveWebResult>>,
+    struct BraveWebSearchApiResponse {
+        web: Option<BraveSearch>,
+    }
+
+    #[derive(Debug, Deserialize, Default)]
+    struct BraveSearch {
+        results: Vec<BraveResult>,
     }
 
     #[derive(Debug, Deserialize)]
-    struct BraveWebResult {
+    struct BraveResult {
         title: String,
-        description: String,
+        description: Option<String>,
         url: String,
     }
 
@@ -161,7 +165,7 @@ fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult
 
     let client = reqwest::blocking::Client::new();
 
-    let search_response: BraveSearchResponse = client
+    let search_response = client
         .get(BRAVE_SEARCH_ENDPOINT)
         .query(&[("q", term)])
         .header("Accept", "application/json")
@@ -169,19 +173,20 @@ fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult
         .send()
         .map_err(|e| format!("Failed to send request: {}", e))?
         .error_for_status()
-        .map_err(|e| format!("Search API error: {}", e))?
+        .map_err(|e| format!("Search API error: {}", e))?;
+
+    // println!("search_response: {:?}", search_response.text().unwrap());
+    // Err("unavailable".to_string())
+
+    let search_response: BraveWebSearchApiResponse = search_response
         .json()
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    let web_results = search_response
-        .web
-        .ok_or("No web results found in response")?;
-
-    let results = web_results
+    let results = search_response.web.unwrap_or_default().results
         .into_iter()
         .map(|result| SearchResult {
             title: result.title,
-            description: result.description,
+            description: result.description.unwrap_or_default(),
             url: result.url,
         })
         .collect();
