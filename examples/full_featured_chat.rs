@@ -24,73 +24,6 @@ struct WebSearchInput {
 struct DateTimeInput {}
 // TODO: Make this easier?
 
-/// A search result from the web search API.
-#[derive(Debug, Serialize, Deserialize)]
-struct SearchResult {
-    title: String,
-    description: String,
-    url: String,
-}
-
-impl std::fmt::Display for SearchResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let json = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
-        write!(f, "{}", json)
-    }
-}
-
-/// Tool that returns the current date and time in ISO 8601 format.
-fn tool_get_datetime() -> String {
-    let now: DateTime<Utc> = Utc::now();
-    now.to_rfc3339()
-}
-
-/// Performs a web search using the Brave Search API.
-fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult>, String> {
-    /// Internal response structure for Brave Search API.
-    #[derive(Debug, Deserialize)]
-    struct BraveSearchResponse {
-        web: Option<Vec<BraveWebResult>>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct BraveWebResult {
-        title: String,
-        description: String,
-        url: String,
-    }
-
-    let api_key = api_key.ok_or("API key is required for web search")?;
-
-    let client = reqwest::blocking::Client::new();
-
-    let search_response: BraveSearchResponse = client
-        .get(BRAVE_SEARCH_ENDPOINT)
-        .query(&[("q", term)])
-        .header("Accept", "application/json")
-        .header("X-Subscription-Token", api_key)
-        .send()
-        .map_err(|e| format!("Failed to send request: {}", e))?
-        .error_for_status()
-        .map_err(|e| format!("Search API error: {}", e))?
-        .json()
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    let web_results = search_response
-        .web
-        .ok_or("No web results found in response")?;
-
-    let results = web_results
-        .into_iter()
-        .map(|result| SearchResult {
-            title: result.title,
-            description: result.description,
-            url: result.url,
-        })
-        .collect();
-
-    Ok(results)
-}
 
 fn main() -> io::Result<()> {
     let key_file = env::args()
@@ -166,6 +99,12 @@ fn main() -> io::Result<()> {
 
                         match tool_web_search(brave_api_key.as_deref(), &input.query) {
                             Ok(results) => {
+                                eprintln!("web_search:Web search results:");
+
+                                for result in &results {
+                                    eprintln!("web_search:  * {}", result.title);
+                                }
+
                                 let results_json =
                                     serde_json::to_string(&results).unwrap_or_else(|_| {
                                         "Failed to serialize search results".to_string()
@@ -173,6 +112,7 @@ fn main() -> io::Result<()> {
                                 tool_results.push(ToolResult::success(id, results_json));
                             }
                             Err(error) => {
+                                eprintln!("web_search: {}", error);
                                 tool_results.push(ToolResult::error(id, error));
                             }
                         }
@@ -193,6 +133,76 @@ fn main() -> io::Result<()> {
     }
 
     Ok(())
+}
+
+
+/// Tool that returns the current date and time in ISO 8601 format.
+fn tool_get_datetime() -> String {
+    let now: DateTime<Utc> = Utc::now();
+    now.to_rfc3339()
+}
+
+/// Performs a web search using the Brave Search API.
+fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult>, String> {
+    /// Internal response structure for Brave Search API.
+    #[derive(Debug, Deserialize)]
+    struct BraveSearchResponse {
+        web: Option<Vec<BraveWebResult>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct BraveWebResult {
+        title: String,
+        description: String,
+        url: String,
+    }
+
+    let api_key = api_key.ok_or("API key is required for web search")?;
+
+    let client = reqwest::blocking::Client::new();
+
+    let search_response: BraveSearchResponse = client
+        .get(BRAVE_SEARCH_ENDPOINT)
+        .query(&[("q", term)])
+        .header("Accept", "application/json")
+        .header("X-Subscription-Token", api_key)
+        .send()
+        .map_err(|e| format!("Failed to send request: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("Search API error: {}", e))?
+        .json()
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let web_results = search_response
+        .web
+        .ok_or("No web results found in response")?;
+
+    let results = web_results
+        .into_iter()
+        .map(|result| SearchResult {
+            title: result.title,
+            description: result.description,
+            url: result.url,
+        })
+        .collect();
+
+    Ok(results)
+}
+
+
+/// A search result from the web search API.
+#[derive(Debug, Serialize, Deserialize)]
+struct SearchResult {
+    title: String,
+    description: String,
+    url: String,
+}
+
+impl std::fmt::Display for SearchResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let json = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
+        write!(f, "{}", json)
+    }
 }
 
 /// Creates a new configured [`Reedline`] instance.

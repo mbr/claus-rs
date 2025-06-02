@@ -31,7 +31,7 @@ im = { version = "15.1", features = ["serde"] }
 schemars = "0.8"
 
 [dev-dependencies]
-reqwest = { workspace = true, features = ["blocking"] }
+reqwest = { workspace = true, features = ["blocking", "json"] }
 reedline = "0.35"
 crossterm = "0.28"
 chrono = { version = "0.4", features = ["serde"] }
