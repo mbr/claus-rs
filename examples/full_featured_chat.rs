@@ -6,6 +6,7 @@ use reedline::{
     DefaultPrompt, DefaultPromptSegment, DefaultValidator, EditCommand, Emacs, KeyCode,
     KeyModifiers, Reedline, ReedlineEvent, Signal, default_emacs_keybindings,
 };
+use reqwest::{blocking::{Client, Request}, Method, Body};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -31,7 +32,6 @@ struct FetchPageInput {
     url: String,
 }
 
-
 fn main() -> io::Result<()> {
     let key_file = env::args()
         .skip(1)
@@ -43,7 +43,7 @@ fn main() -> io::Result<()> {
     let api = klaus::Api::new(api_key);
 
     // Setup HTTP client.
-    let client = reqwest::blocking::Client::new();
+    let client = Client::new();
 
     // Read Brave Search API key from environment variable
     let brave_api_key = env::var("BRAVE_API_KEY").ok();
@@ -83,12 +83,7 @@ fn main() -> io::Result<()> {
             continue;
         };
 
-        // Send the request.
-        let raw = client
-            .execute(http_req.into())
-            .expect("failed to execute request")
-            .text()
-            .expect("failed to fetch contents");
+        let raw = send_request(&client, http_req.into()).expect("failed to send request");
 
         for (idx, item) in conversation
             .handle_response(&raw)
@@ -108,7 +103,7 @@ fn main() -> io::Result<()> {
                     "web_search" => {
                         let input: WebSearchInput = serde_json::from_value(input).unwrap();
 
-                        match tool_web_search(brave_api_key.as_deref(), &input.query) {
+                        match tool_web_search(&client,  brave_api_key.as_deref(), &input.query) {
                             Ok(results) => {
                                 eprintln!("web_search:Web search results:");
 
@@ -131,6 +126,18 @@ fn main() -> io::Result<()> {
                     "get_datetime" => {
                         tool_results.push(ToolResult::success(id, tool_get_datetime()));
                     }
+                    "fetch_page" => {
+                        let input: FetchPageInput = serde_json::from_value(input).unwrap();
+                        match tool_fetch_page(&client, &input.url) {
+                            Ok(content) => {
+                                tool_results.push(ToolResult::success(id, content));
+                            }
+                            Err(error) => {
+                                eprintln!("fetch_page: error: {}", error);
+                                tool_results.push(ToolResult::error(id, error));
+                            }
+                        }
+                    }
                     _ => {
                         tool_results.push(ToolResult::unknown_tool(id, &name));
                     }
@@ -146,6 +153,36 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+fn send_request(client: &Client, req: Request) -> Result<String, String> {
+    let mut retries_left = 3;
+    while retries_left > 0 {
+        let response = client
+            .execute(req.try_clone().expect("Failed to clone request"))
+            .map_err(|e| format!("Failed to send request: {}", e))?;
+
+        if response.status().as_u16() == 429 || response.status().as_u16() == 420 {
+            let retry_after = response
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(1);
+
+            retries_left -= 1;
+
+            eprintln!("Rate limit exceeded. Retrying in {} seconds.", retry_after);
+
+            std::thread::sleep(std::time::Duration::from_secs(retry_after));
+        } else {
+            let response = response.error_for_status().map_err(|e| format!("Request failed: {}", e))?;
+            let body = response
+                .text()
+                .map_err(|e| format!("Failed to read response body: {}", e))?;
+            return Ok(body);
+        }
+    }
+    Err("Rate limit exceeded.".to_string())
+}
 
 /// Tool that returns the current date and time in ISO 8601 format.
 fn tool_get_datetime() -> String {
@@ -154,7 +191,7 @@ fn tool_get_datetime() -> String {
 }
 
 /// Performs a web search using the Brave Search API.
-fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult>, String> {
+fn tool_web_search(client: &Client, api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult>, String> {
     #[derive(Debug, Deserialize)]
     struct BraveWebSearchApiResponse {
         web: Option<BraveSearch>,
@@ -174,26 +211,20 @@ fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult
 
     let api_key = api_key.ok_or("API key is required for web search")?;
 
-    let client = reqwest::blocking::Client::new();
-
-    let search_response = client
-        .get(BRAVE_SEARCH_ENDPOINT)
+    let request = client.get(BRAVE_SEARCH_ENDPOINT)
         .query(&[("q", term)])
         .header("Accept", "application/json")
         .header("X-Subscription-Token", api_key)
-        .send()
-        .map_err(|e| format!("Failed to send request: {}", e))?
-        .error_for_status()
-        .map_err(|e| format!("Search API error: {}", e))?;
+        .build()
+        .expect("Failed to build request");
 
-    // println!("search_response: {:?}", search_response.text().unwrap());
-    // Err("unavailable".to_string())
+    let response = send_request(client, request)?;
+    let search_response: BraveWebSearchApiResponse = serde_json::from_str(&response).map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    let search_response: BraveWebSearchApiResponse = search_response
-        .json()
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    let results = search_response.web.unwrap_or_default().results
+    let results = search_response
+        .web
+        .unwrap_or_default()
+        .results
         .into_iter()
         .map(|result| SearchResult {
             title: result.title,
@@ -205,13 +236,10 @@ fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult
     Ok(results)
 }
 
-fn tool_fetch_page(url: &str) -> Result<String, String> {
-    let client = reqwest::blocking::Client::new();
-    let response = client.get(url).send().map_err(|e| format!("Failed to fetch page: {}", e))?;
-    let body = response.text().map_err(|e| format!("Failed to read page body: {}", e))?;
-    Ok(body)
+fn tool_fetch_page(client: &Client, url: &str) -> Result<String, String> {
+    let request = Request::new( Method::GET, url.parse().expect("Failed to parse URL"));
+    send_request(client, request)
 }
-
 
 /// A search result from the web search API.
 #[derive(Debug, Serialize, Deserialize)]
