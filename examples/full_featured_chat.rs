@@ -9,6 +9,9 @@ use reedline::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Brave Search API endpoint
+const BRAVE_SEARCH_ENDPOINT: &str = "https://api.search.brave.com/res/v1/web/search";
+
 /// Input to the web search tool.
 #[derive(Debug, JsonSchema, Serialize, Deserialize)]
 struct WebSearchInput {
@@ -20,6 +23,74 @@ struct WebSearchInput {
 #[derive(Debug, JsonSchema, Serialize, Deserialize)]
 struct DateTimeInput {}
 // TODO: Make this easier?
+
+/// A search result from the web search API.
+#[derive(Debug, Serialize, Deserialize)]
+struct SearchResult {
+    title: String,
+    description: String,
+    url: String,
+}
+
+impl std::fmt::Display for SearchResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let json = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
+        write!(f, "{}", json)
+    }
+}
+
+/// Tool that returns the current date and time in ISO 8601 format.
+fn tool_get_datetime() -> String {
+    let now: DateTime<Utc> = Utc::now();
+    now.to_rfc3339()
+}
+
+/// Performs a web search using the Brave Search API.
+fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult>, String> {
+    /// Internal response structure for Brave Search API.
+    #[derive(Debug, Deserialize)]
+    struct BraveSearchResponse {
+        web: Option<Vec<BraveWebResult>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct BraveWebResult {
+        title: String,
+        description: String,
+        url: String,
+    }
+
+    let api_key = api_key.ok_or("API key is required for web search")?;
+
+    let client = reqwest::blocking::Client::new();
+
+    let search_response: BraveSearchResponse = client
+        .get(BRAVE_SEARCH_ENDPOINT)
+        .query(&[("q", term)])
+        .header("Accept", "application/json")
+        .header("X-Subscription-Token", api_key)
+        .send()
+        .map_err(|e| format!("Failed to send request: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("Search API error: {}", e))?
+        .json()
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let web_results = search_response
+        .web
+        .ok_or("No web results found in response")?;
+
+    let results = web_results
+        .into_iter()
+        .map(|result| SearchResult {
+            title: result.title,
+            description: result.description,
+            url: result.url,
+        })
+        .collect();
+
+    Ok(results)
+}
 
 fn main() -> io::Result<()> {
     let key_file = env::args()
@@ -33,6 +104,12 @@ fn main() -> io::Result<()> {
 
     // Setup HTTP client.
     let client = reqwest::blocking::Client::new();
+
+    // Read Brave Search API key from environment variable
+    let brave_api_key = env::var("BRAVE_API_KEY").ok();
+    if brave_api_key.is_none() {
+        eprintln!("Warning: BRAVE_API_KEY environment variable not set. Web search will not work.");
+    }
 
     // Create the conversation instance.
     let mut conversation = klaus::conversation::Conversation::new();
@@ -85,10 +162,20 @@ fn main() -> io::Result<()> {
             if let Content::ToolUse(ToolUse { id, name, input }) = item {
                 match name.as_str() {
                     "web_search" => {
-                        tool_results.push(ToolResult::error(
-                            id,
-                            "the web search tool is not implemented",
-                        ));
+                        let input: WebSearchInput = serde_json::from_value(input).unwrap();
+
+                        match tool_web_search(brave_api_key.as_deref(), &input.query) {
+                            Ok(results) => {
+                                let results_json =
+                                    serde_json::to_string(&results).unwrap_or_else(|_| {
+                                        "Failed to serialize search results".to_string()
+                                    });
+                                tool_results.push(ToolResult::success(id, results_json));
+                            }
+                            Err(error) => {
+                                tool_results.push(ToolResult::error(id, error));
+                            }
+                        }
                     }
                     "get_datetime" => {
                         tool_results.push(ToolResult::success(id, tool_get_datetime()));
@@ -106,12 +193,6 @@ fn main() -> io::Result<()> {
     }
 
     Ok(())
-}
-
-/// Tool that returns the current date and time in ISO 8601 format.
-fn tool_get_datetime() -> String {
-    let now: DateTime<Utc> = Utc::now();
-    now.to_rfc3339()
 }
 
 /// Creates a new configured [`Reedline`] instance.
