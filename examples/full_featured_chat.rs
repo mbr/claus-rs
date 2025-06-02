@@ -24,6 +24,13 @@ struct WebSearchInput {
 struct DateTimeInput {}
 // TODO: Make this easier?
 
+/// Input to the fetch page tool.
+#[derive(Debug, JsonSchema, Serialize, Deserialize)]
+struct FetchPageInput {
+    /// The URL of the page to fetch.
+    url: String,
+}
+
 
 fn main() -> io::Result<()> {
     let key_file = env::args()
@@ -49,11 +56,15 @@ fn main() -> io::Result<()> {
     conversation.set_system("You are a helpful personal assistant. You are able to answer questions, search the web, and help with tasks.");
     conversation.add_tool(Tool::new::<WebSearchInput, _, _>(
         "web_search",
-        "Search the web for information",
+        "Searches the web for information. Use this tool to search the web for information. When results are returned, you should use the `fetch_page` tool to fetch the page content, unless the description of the result is enough to answer the user's question.",
     ));
     conversation.add_tool(Tool::new::<DateTimeInput, _, _>(
         "get_datetime",
         "Gets the current date and time in ISO 8601 format. Use this tool to get the current date and time. Do not use this tool to get the date and time of a specific event. Use this especially when the user asks for information about the latest of anything, in case you need to make a web search.",
+    ));
+    conversation.add_tool(Tool::new::<FetchPageInput, _, _>(
+        "fetch_page",
+        "Fetches the content of a web page. Use this tool to fetch the content of a web page. This is useful when the description of the result is not enough to answer the user's question. The page returned will be in HTML format. Sometimes the page may not have the information you need, in which case you should discard this result and continue with the next one.",
     ));
 
     // Set up reedline with custom keybindings
@@ -192,6 +203,13 @@ fn tool_web_search(api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult
         .collect();
 
     Ok(results)
+}
+
+fn tool_fetch_page(url: &str) -> Result<String, String> {
+    let client = reqwest::blocking::Client::new();
+    let response = client.get(url).send().map_err(|e| format!("Failed to fetch page: {}", e))?;
+    let body = response.text().map_err(|e| format!("Failed to read page body: {}", e))?;
+    Ok(body)
 }
 
 
