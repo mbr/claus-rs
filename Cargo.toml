@@ -35,3 +35,4 @@ reqwest = { workspace = true, features = ["blocking"] }
 reedline = "0.35"
 crossterm = "0.28"
 chrono = { version = "0.4", features = ["serde"] }
+toml = "0.8"

@@ -2,17 +2,17 @@
 //!
 //! This example showcases a complete CLI application that uses the klaus library to create
 //! an interactive chat interface with Claude, equipped with multiple tools for enhanced
-//! functionality. Both API keys are configured via a JSON configuration file.
+//! functionality. Both API keys are configured via a TOML configuration file.
 //!
 //! ## Usage
 //!
 //! ```bash
-//! cargo run --example assistant --features="reqwest-blocking" -- config.json
+//! cargo run --example assistant --features="reqwest-blocking" -- config.toml
 //! ```
 //!
 //! ## Configuration File
 //!
-//! See `config.example.json` for the required JSON structure with both API keys.
+//! See `config.example.toml` for the required TOML structure with both API keys.
 //!
 //! ## Key Bindings
 //!
@@ -48,12 +48,12 @@ fn main() -> io::Result<()> {
     let config_file = env::args()
         .skip(1)
         .next()
-        .expect("requires argument: path to JSON config file with API keys");
+        .expect("requires argument: path to TOML config file with API keys");
 
-    // Load configuration from JSON file
+    // Load configuration from TOML file
     let config_content = fs::read_to_string(&config_file).expect("failed to read config file");
     let config: Config =
-        serde_json::from_str(&config_content).expect("failed to parse config JSON");
+        toml::from_str(&config_content).expect("failed to parse config TOML");
 
     // Setup API.
     let api = klaus::Api::new(config.anthropic_api_key);

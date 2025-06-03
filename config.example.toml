@@ -1,0 +1,10 @@
+# Configuration file for the AI Assistant example
+# Copy this file to config.toml and replace the placeholder values with your actual API keys
+
+# Your Anthropic API key for Claude access
+# Get this from: https://console.anthropic.com/
+anthropic_api_key = "sk-ant-api03-your-anthropic-api-key-here"
+
+# Your Brave Search API key for web search functionality  
+# Get this from: https://api.search.brave.com/
+brave_api_key = "your-brave-search-api-key-here" 
