@@ -2,18 +2,23 @@
 //!
 //! This example showcases a complete CLI application that uses the klaus library to create
 //! an interactive chat interface with Claude, equipped with multiple tools for enhanced
-//! functionality.
+//! functionality. Both API keys are configured via a JSON configuration file.
 //!
 //! ## Usage
 //!
 //! ```bash
-//! export BRAVE_API_KEY="your_brave_api_key"
-//! cargo run --example assistant --features="reqwest-blocking" -- path/to/anthropic_key.txt
+//! cargo run --example assistant --features="reqwest-blocking" -- config.json
 //! ```
 //!
-//! ## Environment Variables
+//! ## Configuration File
 //!
-//! - `BRAVE_API_KEY`: Required for web search functionality
+//! The JSON configuration file should contain both required API keys:
+//! ```json
+//! {
+//!   "anthropic_api_key": "your_anthropic_key_here",
+//!   "brave_api_key": "your_brave_api_key_here"
+//! }
+//! ```
 //!
 //! ## Key Bindings
 //!
@@ -28,31 +33,39 @@ use std::{env, fs, io};
 
 use klaus::anthropic::{Content, Tool, ToolResult, ToolUse};
 use reqwest::blocking::{Client, Request};
+use serde::Deserialize;
 use tools::{
     DateTimeInput, FetchPageInput, WebSearchInput, tool_fetch_page, tool_get_datetime,
     tool_web_search,
 };
 use ui::{create_editor, get_user_input};
 
+/// Configuration structure containing API keys needed for the assistant.
+#[derive(Debug, Deserialize)]
+struct Config {
+    /// Anthropic API key for Claude access
+    anthropic_api_key: String,
+    /// Brave Search API key for web search functionality
+    brave_api_key: String,
+}
+
 /// Main entry point for the AI assistant application.
 fn main() -> io::Result<()> {
-    let key_file = env::args()
+    let config_file = env::args()
         .skip(1)
         .next()
-        .expect("requires argument: anthropic api key file");
+        .expect("requires argument: path to JSON config file with API keys");
+
+    // Load configuration from JSON file
+    let config_content = fs::read_to_string(&config_file).expect("failed to read config file");
+    let config: Config =
+        serde_json::from_str(&config_content).expect("failed to parse config JSON");
 
     // Setup API.
-    let api_key = fs::read_to_string(key_file).expect("failed to read key");
-    let api = klaus::Api::new(api_key);
+    let api = klaus::Api::new(config.anthropic_api_key);
 
     // Setup HTTP client.
     let client = Client::new();
-
-    // Read Brave Search API key from environment variable
-    let brave_api_key = env::var("BRAVE_API_KEY").ok();
-    if brave_api_key.is_none() {
-        eprintln!("Warning: BRAVE_API_KEY environment variable not set. Web search will not work.");
-    }
 
     // Create the conversation instance.
     let mut conversation = klaus::conversation::Conversation::new();
@@ -106,7 +119,7 @@ fn main() -> io::Result<()> {
                     "web_search" => {
                         let input: WebSearchInput = serde_json::from_value(input).unwrap();
 
-                        match tool_web_search(&client, brave_api_key.as_deref(), &input.query) {
+                        match tool_web_search(&client, Some(&config.brave_api_key), &input.query) {
                             Ok(results) => {
                                 eprintln!("web_search:Web search results:");
 
