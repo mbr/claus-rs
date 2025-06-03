@@ -6,8 +6,11 @@
 //! ## How to run
 //!
 //! ```shell
-//! $ cargo run --example simple_chat --features reqwest-blocking -- path/to/api_key.txt
+//! $ cargo run --example simple_chat --features reqwest-blocking -- config.toml
 //! ```
+//!
+//! Uses the same `config.toml` file as the assistant example. Only the `anthropic_api_key`
+//! field is required for this example - other fields like `brave_api_key` are ignored.
 //!
 //! Enter messages line by line. Press Ctrl+D (EOF) to exit.
 
@@ -20,18 +23,30 @@ use klaus::{
     anthropic::{Message, MessagesResponse, Role},
     deserialize_response,
 };
+use serde::Deserialize;
+
+/// Configuration structure for simple chat.
+/// Only requires the Anthropic API key - other fields are ignored.
+#[derive(Debug, Deserialize)]
+struct Config {
+    /// Anthropic API key for Claude access
+    anthropic_api_key: String,
+}
 
 fn main() {
-    // Read API from first command line argument, panic if not provided.
-    let key_file = env::args()
+    // Read config from first command line argument, panic if not provided.
+    let config_file = env::args()
         .skip(1)
         .next()
-        .expect("requires argument: anthropic api key file");
+        .expect("requires argument: path to TOML config file");
 
     let client = reqwest::blocking::Client::new();
 
-    let api_key = fs::read_to_string(key_file).expect("failed to read key");
-    let api = klaus::Api::new(api_key);
+    // Load configuration from TOML file
+    let config_content = fs::read_to_string(&config_file).expect("failed to read config file");
+    let config: Config = toml::from_str(&config_content).expect("failed to parse config TOML");
+
+    let api = klaus::Api::new(config.anthropic_api_key);
 
     // Messages will hold our conversation, it will include both user messages and model responses.
     let mut messages = im::Vector::new();

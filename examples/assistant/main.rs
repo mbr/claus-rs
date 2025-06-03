@@ -52,8 +52,7 @@ fn main() -> io::Result<()> {
 
     // Load configuration from TOML file
     let config_content = fs::read_to_string(&config_file).expect("failed to read config file");
-    let config: Config =
-        toml::from_str(&config_content).expect("failed to parse config TOML");
+    let config: Config = toml::from_str(&config_content).expect("failed to parse config TOML");
 
     // Setup API.
     let api = klaus::Api::new(config.anthropic_api_key);
