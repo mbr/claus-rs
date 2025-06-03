@@ -1,3 +1,26 @@
+//! A full-featured AI assistant example demonstrating web search, page fetching, and datetime tools.
+//!
+//! This example showcases a complete CLI application that uses the klaus library to create
+//! an interactive chat interface with Claude, equipped with multiple tools for enhanced
+//! functionality.
+//!
+//! ## Usage
+//!
+//! ```bash
+//! export BRAVE_API_KEY="your_brave_api_key"
+//! cargo run --example assistant --features="reqwest-blocking" -- path/to/anthropic_key.txt
+//! ```
+//!
+//! ## Environment Variables
+//!
+//! - `BRAVE_API_KEY`: Required for web search functionality
+//!
+//! ## Key Bindings
+//!
+//! - Enter: Send message
+//! - Alt+Enter: Insert newline (multiline input)
+//! - Ctrl+C: Quit application
+
 mod tools;
 mod ui;
 
@@ -11,6 +34,7 @@ use tools::{
 };
 use ui::{create_editor, get_user_input};
 
+/// Main entry point for the AI assistant application.
 fn main() -> io::Result<()> {
     let key_file = env::args()
         .skip(1)
@@ -132,6 +156,7 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+/// Sends an HTTP request with automatic retry logic for rate limiting.
 pub fn send_request(client: &Client, req: Request) -> Result<String, String> {
     let mut retries_left = 3;
     while retries_left > 0 {

@@ -1,3 +1,8 @@
+//! Tool implementations for the AI assistant example.
+//!
+//! This module provides all the tool implementations used by the assistant,
+//! including web search via Brave API, web page content fetching, and datetime retrieval.
+
 use std::fmt;
 
 use chrono::{DateTime, Utc};
@@ -21,7 +26,6 @@ pub struct WebSearchInput {
 /// Input to the datetime tool (empty).
 #[derive(Debug, JsonSchema, Serialize, Deserialize)]
 pub struct DateTimeInput {}
-// TODO: Make this easier?
 
 /// Input to the fetch page tool.
 #[derive(Debug, JsonSchema, Serialize, Deserialize)]
@@ -33,8 +37,11 @@ pub struct FetchPageInput {
 /// A search result from the web search API.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchResult {
+    /// The title of the web page
     pub title: String,
+    /// A brief description or snippet from the page
     pub description: String,
+    /// The full URL of the page
     pub url: String,
 }
 

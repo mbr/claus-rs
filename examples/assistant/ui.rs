@@ -1,3 +1,5 @@
+//! User interface components for the AI assistant example.
+
 use reedline::{
     DefaultPrompt, DefaultPromptSegment, DefaultValidator, EditCommand, Emacs, KeyCode,
     KeyModifiers, Reedline, ReedlineEvent, Signal, default_emacs_keybindings,
@@ -9,7 +11,6 @@ pub fn create_editor() -> Reedline {
 
     keybindings.add_binding(KeyModifiers::NONE, KeyCode::Enter, ReedlineEvent::Enter);
 
-    // Add Alt+Enter for manual newlines (helps with multiline input)
     keybindings.add_binding(
         KeyModifiers::ALT,
         KeyCode::Enter,
