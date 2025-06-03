@@ -4,14 +4,11 @@ mod ui;
 use std::{env, fs, io};
 
 use klaus::anthropic::{Content, Tool, ToolResult, ToolUse};
-use reedline::{
-    DefaultValidator, EditCommand, Emacs, KeyCode, KeyModifiers, Reedline, ReedlineEvent,
-    default_emacs_keybindings,
-};
 use reqwest::blocking::{Client, Request};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tools::{tool_fetch_page, tool_get_datetime, tool_web_search};
+use ui::{create_editor, get_user_input};
 
 /// Input to the web search tool.
 #[derive(Debug, JsonSchema, Serialize, Deserialize)]
@@ -75,7 +72,7 @@ fn main() -> io::Result<()> {
     let mut pending_request = None;
     loop {
         let Some(http_req) = pending_request.take() else {
-            let Some(line) = ui::get_user_input(&conversation, &mut line_editor) else {
+            let Some(line) = get_user_input(&conversation, &mut line_editor) else {
                 // User requested to quit.
                 break;
             };
@@ -184,25 +181,4 @@ pub fn send_request(client: &Client, req: Request) -> Result<String, String> {
         }
     }
     Err("Rate limit exceeded.".to_string())
-}
-
-/// Creates a new configured [`Reedline`] instance.
-fn create_editor() -> Reedline {
-    let mut keybindings = default_emacs_keybindings();
-
-    keybindings.add_binding(KeyModifiers::NONE, KeyCode::Enter, ReedlineEvent::Enter);
-
-    // Add Alt+Enter for manual newlines (helps with multiline input)
-    keybindings.add_binding(
-        KeyModifiers::ALT,
-        KeyCode::Enter,
-        ReedlineEvent::Edit(vec![EditCommand::InsertNewline]),
-    );
-
-    let edit_mode = Box::new(Emacs::new(keybindings));
-
-    Reedline::create()
-        .with_edit_mode(edit_mode)
-        // Note: We need a validator to support multiline input.
-        .with_validator(Box::new(DefaultValidator))
 }
