@@ -18,8 +18,8 @@ path = "examples/simple_chat.rs"
 required-features = ["reqwest-blocking"]
 
 [[example]]
-name = "full_featured_chat"
-path = "examples/full_featured_chat.rs"
+name = "assistant"
+path = "examples/assistant/main.rs"
 required-features = ["reqwest-blocking"]
 
 [dependencies]

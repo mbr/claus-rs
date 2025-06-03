@@ -1,12 +1,13 @@
+mod ui;
+
 use std::{env, fs, io};
 
 use chrono::{DateTime, Utc};
 use klaus::anthropic::{Content, Tool, ToolResult, ToolUse};
 use reedline::{
-    DefaultPrompt, DefaultPromptSegment, DefaultValidator, EditCommand, Emacs, KeyCode,
-    KeyModifiers, Reedline, ReedlineEvent, Signal, default_emacs_keybindings,
+    DefaultValidator, EditCommand, Emacs, KeyCode, KeyModifiers, Reedline, ReedlineEvent, default_emacs_keybindings,
 };
-use reqwest::{blocking::{Client, Request}, Method, Body};
+use reqwest::{blocking::{Client, Request}, Method};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -75,7 +76,7 @@ fn main() -> io::Result<()> {
     let mut pending_request = None;
     loop {
         let Some(http_req) = pending_request.take() else {
-            let Some(line) = get_user_input(&conversation, &mut line_editor) else {
+            let Some(line) = ui::get_user_input(&conversation, &mut line_editor) else {
                 // User requested to quit.
                 break;
             };
@@ -275,37 +276,4 @@ fn create_editor() -> Reedline {
         .with_edit_mode(edit_mode)
         // Note: We need a validator to support multiline input.
         .with_validator(Box::new(DefaultValidator))
-}
-
-/// Returns the next user input, returning `None` if the program should exit.
-fn get_user_input(
-    conversation: &klaus::conversation::Conversation,
-    line_editor: &mut Reedline,
-) -> Option<String> {
-    let prompt = DefaultPrompt::new(
-        DefaultPromptSegment::Basic(format!("[{}] You", conversation.history().len())),
-        DefaultPromptSegment::CurrentDateTime,
-    );
-
-    loop {
-        let sig = line_editor.read_line(&prompt);
-        match sig {
-            Ok(Signal::Success(buffer)) => {
-                let user_message = buffer.trim();
-
-                if user_message.is_empty() {
-                    continue;
-                }
-
-                return Some(user_message.to_owned());
-            }
-            Ok(Signal::CtrlC) | Ok(Signal::CtrlD) => {
-                return None;
-            }
-            Err(err) => {
-                eprintln!("Error: {}", err);
-                return None;
-            }
-        }
-    }
 }
