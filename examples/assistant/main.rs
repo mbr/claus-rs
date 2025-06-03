@@ -5,29 +5,11 @@ use std::{env, fs, io};
 
 use klaus::anthropic::{Content, Tool, ToolResult, ToolUse};
 use reqwest::blocking::{Client, Request};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use tools::{tool_fetch_page, tool_get_datetime, tool_web_search};
+use tools::{
+    DateTimeInput, FetchPageInput, WebSearchInput, tool_fetch_page, tool_get_datetime,
+    tool_web_search,
+};
 use ui::{create_editor, get_user_input};
-
-/// Input to the web search tool.
-#[derive(Debug, JsonSchema, Serialize, Deserialize)]
-struct WebSearchInput {
-    /// The query to search for.
-    query: String,
-}
-
-/// Input to the datetime tool (empty).
-#[derive(Debug, JsonSchema, Serialize, Deserialize)]
-struct DateTimeInput {}
-// TODO: Make this easier?
-
-/// Input to the fetch page tool.
-#[derive(Debug, JsonSchema, Serialize, Deserialize)]
-struct FetchPageInput {
-    /// The URL of the page to fetch.
-    url: String,
-}
 
 fn main() -> io::Result<()> {
     let key_file = env::args()

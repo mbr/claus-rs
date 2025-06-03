@@ -5,10 +5,30 @@ use reqwest::{
     Method,
     blocking::{Client, Request},
 };
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Brave Search API endpoint
 const BRAVE_SEARCH_ENDPOINT: &str = "https://api.search.brave.com/res/v1/web/search";
+
+/// Input to the web search tool.
+#[derive(Debug, JsonSchema, Serialize, Deserialize)]
+pub struct WebSearchInput {
+    /// The query to search for.
+    pub query: String,
+}
+
+/// Input to the datetime tool (empty).
+#[derive(Debug, JsonSchema, Serialize, Deserialize)]
+pub struct DateTimeInput {}
+// TODO: Make this easier?
+
+/// Input to the fetch page tool.
+#[derive(Debug, JsonSchema, Serialize, Deserialize)]
+pub struct FetchPageInput {
+    /// The URL of the page to fetch.
+    pub url: String,
+}
 
 /// A search result from the web search API.
 #[derive(Debug, Serialize, Deserialize)]
