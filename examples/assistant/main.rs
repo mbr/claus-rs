@@ -12,13 +12,7 @@
 //!
 //! ## Configuration File
 //!
-//! The JSON configuration file should contain both required API keys:
-//! ```json
-//! {
-//!   "anthropic_api_key": "your_anthropic_key_here",
-//!   "brave_api_key": "your_brave_api_key_here"
-//! }
-//! ```
+//! See `config.example.json` for the required JSON structure with both API keys.
 //!
 //! ## Key Bindings
 //!
