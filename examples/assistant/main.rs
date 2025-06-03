@@ -1,18 +1,17 @@
+mod tools;
 mod ui;
 
 use std::{env, fs, io};
 
-use chrono::{DateTime, Utc};
 use klaus::anthropic::{Content, Tool, ToolResult, ToolUse};
 use reedline::{
-    DefaultValidator, EditCommand, Emacs, KeyCode, KeyModifiers, Reedline, ReedlineEvent, default_emacs_keybindings,
+    DefaultValidator, EditCommand, Emacs, KeyCode, KeyModifiers, Reedline, ReedlineEvent,
+    default_emacs_keybindings,
 };
-use reqwest::{blocking::{Client, Request}, Method};
+use reqwest::blocking::{Client, Request};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-/// Brave Search API endpoint
-const BRAVE_SEARCH_ENDPOINT: &str = "https://api.search.brave.com/res/v1/web/search";
+use tools::{tool_fetch_page, tool_get_datetime, tool_web_search};
 
 /// Input to the web search tool.
 #[derive(Debug, JsonSchema, Serialize, Deserialize)]
@@ -104,7 +103,7 @@ fn main() -> io::Result<()> {
                     "web_search" => {
                         let input: WebSearchInput = serde_json::from_value(input).unwrap();
 
-                        match tool_web_search(&client,  brave_api_key.as_deref(), &input.query) {
+                        match tool_web_search(&client, brave_api_key.as_deref(), &input.query) {
                             Ok(results) => {
                                 eprintln!("web_search:Web search results:");
 
@@ -154,7 +153,7 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn send_request(client: &Client, req: Request) -> Result<String, String> {
+pub fn send_request(client: &Client, req: Request) -> Result<String, String> {
     let mut retries_left = 3;
     while retries_left > 0 {
         let response = client
@@ -175,7 +174,9 @@ fn send_request(client: &Client, req: Request) -> Result<String, String> {
 
             std::thread::sleep(std::time::Duration::from_secs(retry_after));
         } else {
-            let response = response.error_for_status().map_err(|e| format!("Request failed: {}", e))?;
+            let response = response
+                .error_for_status()
+                .map_err(|e| format!("Request failed: {}", e))?;
             let body = response
                 .text()
                 .map_err(|e| format!("Failed to read response body: {}", e))?;
@@ -183,78 +184,6 @@ fn send_request(client: &Client, req: Request) -> Result<String, String> {
         }
     }
     Err("Rate limit exceeded.".to_string())
-}
-
-/// Tool that returns the current date and time in ISO 8601 format.
-fn tool_get_datetime() -> String {
-    let now: DateTime<Utc> = Utc::now();
-    now.to_rfc3339()
-}
-
-/// Performs a web search using the Brave Search API.
-fn tool_web_search(client: &Client, api_key: Option<&str>, term: &str) -> Result<Vec<SearchResult>, String> {
-    #[derive(Debug, Deserialize)]
-    struct BraveWebSearchApiResponse {
-        web: Option<BraveSearch>,
-    }
-
-    #[derive(Debug, Deserialize, Default)]
-    struct BraveSearch {
-        results: Vec<BraveResult>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct BraveResult {
-        title: String,
-        description: Option<String>,
-        url: String,
-    }
-
-    let api_key = api_key.ok_or("API key is required for web search")?;
-
-    let request = client.get(BRAVE_SEARCH_ENDPOINT)
-        .query(&[("q", term)])
-        .header("Accept", "application/json")
-        .header("X-Subscription-Token", api_key)
-        .build()
-        .expect("Failed to build request");
-
-    let response = send_request(client, request)?;
-    let search_response: BraveWebSearchApiResponse = serde_json::from_str(&response).map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    let results = search_response
-        .web
-        .unwrap_or_default()
-        .results
-        .into_iter()
-        .map(|result| SearchResult {
-            title: result.title,
-            description: result.description.unwrap_or_default(),
-            url: result.url,
-        })
-        .collect();
-
-    Ok(results)
-}
-
-fn tool_fetch_page(client: &Client, url: &str) -> Result<String, String> {
-    let request = Request::new( Method::GET, url.parse().expect("Failed to parse URL"));
-    send_request(client, request)
-}
-
-/// A search result from the web search API.
-#[derive(Debug, Serialize, Deserialize)]
-struct SearchResult {
-    title: String,
-    description: String,
-    url: String,
-}
-
-impl std::fmt::Display for SearchResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let json = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
-        write!(f, "{}", json)
-    }
 }
 
 /// Creates a new configured [`Reedline`] instance.
