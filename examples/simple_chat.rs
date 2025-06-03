@@ -9,8 +9,7 @@
 //! $ cargo run --example simple_chat --features reqwest-blocking -- config.toml
 //! ```
 //!
-//! Uses the same `config.toml` file as the assistant example. Only the `anthropic_api_key`
-//! field is required for this example - other fields like `brave_api_key` are ignored.
+//! Requires a TOML configuration file with your Anthropic API key.
 //!
 //! Enter messages line by line. Press Ctrl+D (EOF) to exit.
 
