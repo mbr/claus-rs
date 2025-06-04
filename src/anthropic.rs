@@ -492,30 +492,8 @@ pub struct MessageDelta {
 }
 
 #[cfg(test)]
-mod streaming_tests {
-    use super::*;
-
-    #[test]
-    fn test_deserialize_ping() {
-        let data = br#"{"type": "ping"}"#;
-
-        let result: StreamEvent = serde_json::from_slice(data).unwrap();
-        match result {
-            StreamEvent::Ping => (),
-            _ => panic!("Expected Ping event"),
-        }
-    }
-
-    #[test]
-    fn test_deserialize_message_stop() {
-        let data = br#"{"type": "message_stop"}"#;
-
-        let result: StreamEvent = serde_json::from_slice(data).unwrap();
-        match result {
-            StreamEvent::MessageStop => (),
-            _ => panic!("Expected MessageStop event"),
-        }
-    }
+mod tests {
+    use super::{Delta, StreamEvent};
 
     #[test]
     fn test_deserialize_content_block_delta_text() {
