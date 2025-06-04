@@ -277,6 +277,31 @@ where
     }
 }
 
+/// Deserializes a streaming event from JSON.
+///
+/// Used to deserialize Server Sent Events that will be returned from the Anthropic API if `stream`
+/// is set to `true`. Splitting and pre-parsing the events must be done by the caller (i.e. the
+/// `event:` and `data:` prefixes must have been removed and multiline events joined).
+///
+/// The event type is determined from the JSON data itself via the "type" field, it does not rely
+/// on the `event` part of the SSE stream event.
+///
+/// # Example
+///
+/// ```
+/// # use klaus::deserialize_event;
+/// # use klaus::anthropic::StreamEvent;
+/// let json = br#"{"type": "ping"}"#;
+/// let event: StreamEvent = deserialize_event(json).unwrap();
+/// match event {
+///     StreamEvent::Ping => println!("Received ping"),
+///     _ => {}
+/// }
+/// ```
+pub fn deserialize_event(data: &[u8]) -> Result<anthropic::StreamEvent, serde_json::Error> {
+    serde_json::from_slice(data)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

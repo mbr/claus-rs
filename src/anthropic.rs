@@ -491,113 +491,15 @@ pub struct MessageDelta {
     pub stop_sequence: Option<String>,
 }
 
-/// State machine for handling streaming responses.
-#[derive(Debug, Default)]
-pub struct StreamedResponse;
-
-impl StreamedResponse {
-    /// Creates a new streaming response handler.
-    pub fn new() -> Self {
-        Self
-    }
-
-    /// Handle a streaming event with the given event type and data.
-    ///
-    /// Arguments passed in should be the raw values decoded from the SSE stream.
-    pub fn handle_event(
-        &mut self,
-        event: &[u8],
-        data: &[u8],
-    ) -> Result<StreamEvent, serde_json::Error> {
-        match event {
-            b"message_start" => {
-                #[derive(Deserialize)]
-                struct MessageStartData {
-                    message: MessagesResponse,
-                }
-                let parsed: MessageStartData = serde_json::from_slice(data)?;
-                Ok(StreamEvent::MessageStart(parsed.message))
-            }
-            b"content_block_start" => {
-                #[derive(Deserialize)]
-                struct ContentBlockStartData {
-                    index: u32,
-                    content_block: Content,
-                }
-                let parsed: ContentBlockStartData = serde_json::from_slice(data)?;
-                Ok(StreamEvent::ContentBlockStart {
-                    index: parsed.index,
-                    content_block: parsed.content_block,
-                })
-            }
-            b"content_block_delta" => {
-                #[derive(Deserialize)]
-                struct ContentBlockDeltaData {
-                    index: u32,
-                    delta: Delta,
-                }
-                let parsed: ContentBlockDeltaData = serde_json::from_slice(data)?;
-                Ok(StreamEvent::ContentBlockDelta {
-                    index: parsed.index,
-                    delta: parsed.delta,
-                })
-            }
-            b"content_block_stop" => {
-                #[derive(Deserialize)]
-                struct ContentBlockStopData {
-                    index: u32,
-                }
-                let parsed: ContentBlockStopData = serde_json::from_slice(data)?;
-                Ok(StreamEvent::ContentBlockStop {
-                    index: parsed.index,
-                })
-            }
-            b"message_delta" => {
-                #[derive(Deserialize)]
-                struct MessageDeltaData {
-                    delta: MessageDelta,
-                    usage: Option<Usage>,
-                }
-                let parsed: MessageDeltaData = serde_json::from_slice(data)?;
-                Ok(StreamEvent::MessageDelta {
-                    delta: parsed.delta,
-                    usage: parsed.usage,
-                })
-            }
-            b"message_stop" => Ok(StreamEvent::MessageStop),
-            b"ping" => Ok(StreamEvent::Ping),
-            b"error" => {
-                #[derive(Deserialize)]
-                struct ErrorData {
-                    error: ApiError,
-                }
-                let parsed: ErrorData = serde_json::from_slice(data)?;
-                Ok(StreamEvent::Error {
-                    error: parsed.error,
-                })
-            }
-            _ => {
-                // Handle unknown events gracefully as per the API specification
-                Ok(StreamEvent::Unknown {
-                    event_type: event.to_vec(),
-                    data: data.to_vec(),
-                })
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod streaming_tests {
     use super::*;
 
     #[test]
-    fn test_streamed_response_ping() {
-        let mut streamed = StreamedResponse::new();
-        let event = b"ping";
-        let data = b"{}";
+    fn test_deserialize_ping() {
+        let data = br#"{"type": "ping"}"#;
 
-        let result = streamed.handle_event(event, data).unwrap();
+        let result: StreamEvent = serde_json::from_slice(data).unwrap();
         match result {
             StreamEvent::Ping => (),
             _ => panic!("Expected Ping event"),
@@ -605,12 +507,10 @@ mod streaming_tests {
     }
 
     #[test]
-    fn test_streamed_response_message_stop() {
-        let mut streamed = StreamedResponse::new();
-        let event = b"message_stop";
-        let data = b"{}";
+    fn test_deserialize_message_stop() {
+        let data = br#"{"type": "message_stop"}"#;
 
-        let result = streamed.handle_event(event, data).unwrap();
+        let result: StreamEvent = serde_json::from_slice(data).unwrap();
         match result {
             StreamEvent::MessageStop => (),
             _ => panic!("Expected MessageStop event"),
@@ -618,12 +518,10 @@ mod streaming_tests {
     }
 
     #[test]
-    fn test_streamed_response_content_block_delta_text() {
-        let mut streamed = StreamedResponse::new();
-        let event = b"content_block_delta";
-        let data = br#"{"index": 0, "delta": {"type": "text_delta", "text": "Hello"}}"#;
+    fn test_deserialize_content_block_delta_text() {
+        let data = br#"{"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "Hello"}}"#;
 
-        let result = streamed.handle_event(event, data).unwrap();
+        let result: StreamEvent = serde_json::from_slice(data).unwrap();
         match result {
             StreamEvent::ContentBlockDelta { index, delta } => {
                 assert_eq!(index, 0);
@@ -637,16 +535,17 @@ mod streaming_tests {
     }
 
     #[test]
-    fn test_streamed_response_unknown_event() {
-        let mut streamed = StreamedResponse::new();
-        let event = b"unknown_event_type";
-        let data = b"some data";
+    fn test_deserialize_unknown_event() {
+        let data = br#"{"type": "unknown_event_type", "data": "some data"}"#;
 
-        let result = streamed.handle_event(event, data).unwrap();
+        let result: StreamEvent = serde_json::from_slice(data).unwrap();
         match result {
             StreamEvent::Unknown { event_type, data } => {
                 assert_eq!(event_type, b"unknown_event_type");
-                assert_eq!(data, b"some data");
+                assert_eq!(
+                    data,
+                    br#"{"type": "unknown_event_type", "data": "some data"}"#
+                );
             }
             _ => panic!("Expected Unknown event"),
         }
