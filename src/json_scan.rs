@@ -9,7 +9,7 @@ enum ScanState {
 #[derive(Debug, PartialEq)]
 pub enum ScanResult {
     NeedsMore,
-    Error,
+    Error(usize), // Position where the error occurred
     Found(usize), // Split point in the input slice
 }
 
@@ -36,7 +36,7 @@ impl JsonScanner {
                         self.state = ScanState::InObject;
                         self.brace_depth = 1;
                     } else {
-                        return ScanResult::Error;
+                        return ScanResult::Error(i);
                     }
                 }
 
