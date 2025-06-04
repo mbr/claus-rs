@@ -471,7 +471,10 @@ pub enum StreamEvent {
     /// Error event.
     Error { error: ApiError },
     /// Unknown event type that should be handled gracefully.
-    Unknown { event_type: Vec<u8>, data: Vec<u8> },
+    ///
+    /// It had a valid `type` tag, but nothing more is known about it.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Delta types for content block updates.
@@ -517,15 +520,6 @@ mod tests {
         let data = br#"{"type": "unknown_event_type", "data": "some data"}"#;
 
         let result: StreamEvent = serde_json::from_slice(data).unwrap();
-        match result {
-            StreamEvent::Unknown { event_type, data } => {
-                assert_eq!(event_type, b"unknown_event_type");
-                assert_eq!(
-                    data,
-                    br#"{"type": "unknown_event_type", "data": "some data"}"#
-                );
-            }
-            _ => panic!("Expected Unknown event"),
-        }
+        assert!(matches!(result, StreamEvent::Unknown));
     }
 }
