@@ -471,7 +471,7 @@ pub enum StreamEvent {
     /// Error event.
     Error { error: ApiError },
     /// Unknown event type that should be handled gracefully.
-    Unknown { event_type: String, data: String },
+    Unknown { event_type: Vec<u8>, data: Vec<u8> },
 }
 
 /// Delta types for content block updates.
@@ -509,15 +509,13 @@ impl StreamedResponse {
         event: &[u8],
         data: &[u8],
     ) -> Result<StreamEvent, serde_json::Error> {
-        let data_str = std::str::from_utf8(data).unwrap_or("");
-
         match event {
             b"message_start" => {
                 #[derive(Deserialize)]
                 struct MessageStartData {
                     message: MessagesResponse,
                 }
-                let parsed: MessageStartData = serde_json::from_str(data_str)?;
+                let parsed: MessageStartData = serde_json::from_slice(data)?;
                 Ok(StreamEvent::MessageStart(parsed.message))
             }
             b"content_block_start" => {
@@ -526,7 +524,7 @@ impl StreamedResponse {
                     index: u32,
                     content_block: Content,
                 }
-                let parsed: ContentBlockStartData = serde_json::from_str(data_str)?;
+                let parsed: ContentBlockStartData = serde_json::from_slice(data)?;
                 Ok(StreamEvent::ContentBlockStart {
                     index: parsed.index,
                     content_block: parsed.content_block,
@@ -538,7 +536,7 @@ impl StreamedResponse {
                     index: u32,
                     delta: Delta,
                 }
-                let parsed: ContentBlockDeltaData = serde_json::from_str(data_str)?;
+                let parsed: ContentBlockDeltaData = serde_json::from_slice(data)?;
                 Ok(StreamEvent::ContentBlockDelta {
                     index: parsed.index,
                     delta: parsed.delta,
@@ -549,7 +547,7 @@ impl StreamedResponse {
                 struct ContentBlockStopData {
                     index: u32,
                 }
-                let parsed: ContentBlockStopData = serde_json::from_str(data_str)?;
+                let parsed: ContentBlockStopData = serde_json::from_slice(data)?;
                 Ok(StreamEvent::ContentBlockStop {
                     index: parsed.index,
                 })
@@ -560,7 +558,7 @@ impl StreamedResponse {
                     delta: MessageDelta,
                     usage: Option<Usage>,
                 }
-                let parsed: MessageDeltaData = serde_json::from_str(data_str)?;
+                let parsed: MessageDeltaData = serde_json::from_slice(data)?;
                 Ok(StreamEvent::MessageDelta {
                     delta: parsed.delta,
                     usage: parsed.usage,
@@ -573,17 +571,16 @@ impl StreamedResponse {
                 struct ErrorData {
                     error: ApiError,
                 }
-                let parsed: ErrorData = serde_json::from_str(data_str)?;
+                let parsed: ErrorData = serde_json::from_slice(data)?;
                 Ok(StreamEvent::Error {
                     error: parsed.error,
                 })
             }
             _ => {
                 // Handle unknown events gracefully as per the API specification
-                let event_str = std::str::from_utf8(event).unwrap_or("");
                 Ok(StreamEvent::Unknown {
-                    event_type: event_str.to_string(),
-                    data: data_str.to_string(),
+                    event_type: event.to_vec(),
+                    data: data.to_vec(),
                 })
             }
         }
@@ -648,8 +645,8 @@ mod streaming_tests {
         let result = streamed.handle_event(event, data).unwrap();
         match result {
             StreamEvent::Unknown { event_type, data } => {
-                assert_eq!(event_type, "unknown_event_type");
-                assert_eq!(data, "some data");
+                assert_eq!(event_type, b"unknown_event_type");
+                assert_eq!(data, b"some data");
             }
             _ => panic!("Expected Unknown event"),
         }
