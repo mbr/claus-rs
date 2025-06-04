@@ -473,8 +473,11 @@ pub enum StreamEvent {
     /// Unknown event type that should be handled gracefully.
     ///
     /// It had a valid `type` tag, but nothing more is known about it.
-    #[serde(other)]
-    Unknown,
+    #[serde(skip)]
+    Unknown {
+        event_type: Vec<u8>,
+        contents: serde_json::Value,
+    },
 }
 
 /// Delta types for content block updates.
@@ -519,7 +522,17 @@ mod tests {
     fn test_deserialize_unknown_event() {
         let data = br#"{"type": "unknown_event_type", "data": "some data"}"#;
 
-        let result: StreamEvent = serde_json::from_slice(data).unwrap();
-        assert!(matches!(result, StreamEvent::Unknown));
+        let result = crate::deserialize_event(data).unwrap();
+        match result {
+            StreamEvent::Unknown {
+                event_type,
+                contents,
+            } => {
+                assert_eq!(event_type, b"unknown_event_type");
+                assert_eq!(contents["data"], "some data");
+                assert_eq!(contents["type"], "unknown_event_type");
+            }
+            _ => panic!("Expected Unknown event"),
+        }
     }
 }

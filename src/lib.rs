@@ -299,7 +299,30 @@ where
 /// }
 /// ```
 pub fn deserialize_event(data: &[u8]) -> Result<anthropic::StreamEvent, serde_json::Error> {
-    serde_json::from_slice(data)
+    // First, try to deserialize normally
+    match serde_json::from_slice(data) {
+        Ok(event) => Ok(event),
+        Err(original_error) => {
+            // If that fails, try to extract just the type and full contents for unknown events
+            #[derive(serde::Deserialize)]
+            struct UnknownEventHelper {
+                #[serde(rename = "type")]
+                event_type: String,
+            }
+
+            match serde_json::from_slice::<UnknownEventHelper>(data) {
+                Ok(helper) => {
+                    // Parse the full JSON as a Value to preserve all fields
+                    let contents: serde_json::Value = serde_json::from_slice(data)?;
+                    Ok(anthropic::StreamEvent::Unknown {
+                        event_type: helper.event_type.into_bytes(),
+                        contents,
+                    })
+                }
+                Err(_e) => Err(original_error),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
