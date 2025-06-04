@@ -2,6 +2,7 @@
 
 /// Make it easier for users to hold shares message histories, if necessary.
 pub use im;
+pub mod json_scan;
 
 pub mod anthropic;
 pub mod conversation;
