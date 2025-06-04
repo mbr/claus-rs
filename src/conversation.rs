@@ -38,11 +38,9 @@
 //!
 //! // Handle the response
 //! match conversation.handle_response(response_json) {
-//!     Ok(action) => match action {
-//!         klaus::conversation::Action::HandleAgentMessage(content) => {
-//!             for item in content {
-//!                 println!("Assistant: {}", item);
-//!             }
+//!     Ok(action) => {
+//!         for item in action.contents {
+//!             println!("Assistant: {}", item);
 //!         }
 //!     },
 //!     Err(e) => eprintln!("Error: {}", e),

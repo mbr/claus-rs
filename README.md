@@ -67,11 +67,7 @@ let response_json: String = todo!("send `http_request` and retrieve text respons
 let action = conversation.handle_response(&response_json)
     .expect("failed to handle response");
 
-match action {
-    klaus::conversation::Action::HandleAgentMessage(content) => {
-        for item in content {
-            println!("Assistant: {}", item);
-        }
-    }
+for item in action.contents {
+    println!("Assistant: {}", item);
 }
 ```
