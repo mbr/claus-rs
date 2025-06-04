@@ -57,16 +57,10 @@ async fn main() {
 
         println!("Sending request...");
 
-        // Create RequestBuilder directly from HttpRequest data
-        let url = format!("https://{}{}", http_req.host, http_req.path);
-        let method = reqwest::Method::from_bytes(http_req.method.as_bytes()).unwrap();
-
-        let mut request_builder = client.request(method, &url).body(http_req.body.clone());
-
-        // Add headers
-        for (key, value) in &http_req.headers {
-            request_builder = request_builder.header(*key, value.as_ref());
-        }
+        // Use the new helper method to convert HttpRequest to RequestBuilder
+        let request_builder = http_req
+            .try_into_reqwest_builder(&client)
+            .expect("failed to create request builder");
 
         let mut es = EventSource::new(request_builder).expect("failed to create event source");
 

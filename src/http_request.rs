@@ -93,6 +93,24 @@ impl HttpRequest {
 
         Ok(request)
     }
+
+    /// Converts this [`HttpRequest`] into a [`reqwest::RequestBuilder`] using the provided client.
+    pub fn try_into_reqwest_builder(
+        self,
+        client: &reqwest::Client,
+    ) -> Result<reqwest::RequestBuilder, Box<dyn std::error::Error>> {
+        let method = reqwest::Method::from_bytes(self.method.as_bytes())?;
+        let url_string = format!("https://{}{}", self.host, self.path);
+
+        let mut request_builder = client.request(method, &url_string).body(self.body);
+
+        // Add headers
+        for (key, value) in self.headers {
+            request_builder = request_builder.header(key, value.as_ref());
+        }
+
+        Ok(request_builder)
+    }
 }
 
 #[cfg(feature = "reqwest-blocking")]
@@ -225,6 +243,56 @@ mod tests {
         assert_eq!(headers.get("x-api-key").unwrap(), "test-key");
 
         let body = reqwest_request.body().unwrap();
+        let body_bytes = body.as_bytes().unwrap();
+        let body_str = std::str::from_utf8(body_bytes).unwrap();
+        assert!(body_str.contains("Hello, world!"));
+        assert!(body_str.contains("\"type\":\"text\""));
+    }
+
+    #[cfg(feature = "reqwest")]
+    #[test]
+    fn test_http_request_to_reqwest_request_builder() {
+        let http_request = super::HttpRequest {
+            host: "api.anthropic.com".to_string(),
+            path: "/v1/messages".to_string(),
+            method: "POST",
+            headers: vec![
+                ("content-type", std::sync::Arc::from("application/json")),
+                ("anthropic-version", std::sync::Arc::from("2023-06-01")),
+                ("x-api-key", std::sync::Arc::from("test-key")),
+                (
+                    "anthropic-model",
+                    std::sync::Arc::from("claude-3-sonnet-20240229"),
+                ),
+                ("max-tokens", std::sync::Arc::from("1024")),
+            ],
+            body:
+                r#"{"messages":[{"role":"user","content":{"type":"text","text":"Hello, world!"}}]}"#
+                    .to_string(),
+        };
+
+        let client = reqwest::Client::new();
+
+        // Convert to reqwest::RequestBuilder
+        let request_builder = http_request
+            .try_into_reqwest_builder(&client)
+            .expect("should convert successfully");
+
+        // Build the request to test it
+        let request = request_builder.build().expect("should build successfully");
+
+        assert_eq!(request.method(), &reqwest::Method::POST);
+        assert_eq!(
+            request.url().as_str(),
+            "https://api.anthropic.com/v1/messages"
+        );
+
+        let headers = request.headers();
+        assert_eq!(headers.get("content-type").unwrap(), "application/json");
+        assert_eq!(headers.get("anthropic-version").unwrap(), "2023-06-01");
+        assert_eq!(headers.get("x-api-key").unwrap(), "test-key");
+
+        let body = request.body().unwrap();
         let body_bytes = body.as_bytes().unwrap();
         let body_str = std::str::from_utf8(body_bytes).unwrap();
         assert!(body_str.contains("Hello, world!"));
