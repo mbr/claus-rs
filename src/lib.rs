@@ -102,8 +102,10 @@ pub struct MessagesRequestBuilder {
     messages: im::Vector<anthropic::Message>,
     /// Tools available for the model to use.
     tools: Option<im::Vector<anthropic::Tool>>,
+    /// Whether to stream the response.
+    stream: bool,
     // Note: Missing: container, mcp_servers, metadata, service_tier,
-    //                stop_sequences, stream, temperature, thinking,
+    //                stop_sequences, temperature, thinking,
     //                tool_choice, top_k, top_p
 }
 
@@ -122,6 +124,7 @@ impl MessagesRequestBuilder {
             system: None,
             messages: im::Vector::new(),
             tools: None,
+            stream: false,
         }
     }
 
@@ -179,6 +182,12 @@ impl MessagesRequestBuilder {
         self
     }
 
+    /// Sets whether to stream the response.
+    pub fn stream(mut self, stream: bool) -> Self {
+        self.stream = stream;
+        self
+    }
+
     /// Builds the HTTP request.
     ///
     /// The resulting [`HttpRequest`] can be sent to the API using a suitable HTTP client.
@@ -212,6 +221,7 @@ impl MessagesRequestBuilder {
                 system,
                 messages: &self.messages,
                 tools: self.tools.as_ref(),
+                stream: self.stream,
             };
 
             serde_json::to_string(&body).expect("failed to serialize messages")

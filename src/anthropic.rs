@@ -37,6 +37,14 @@ pub struct MessagesBody<'a> {
     /// Tools available for the model to use.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<&'a im::Vector<Tool>>,
+    /// Whether to stream the response.
+    #[serde(skip_serializing_if = "is_false")]
+    pub stream: bool,
+}
+
+/// Helper function to check if a boolean is false, used with `serde(skip_serializing_if)`.
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 /// A role in a conversation.
