@@ -18,6 +18,11 @@ path = "examples/simple_chat.rs"
 required-features = ["reqwest-blocking"]
 
 [[example]]
+name = "streaming"
+path = "examples/streaming.rs"
+required-features = ["reqwest"]
+
+[[example]]
 name = "assistant"
 path = "examples/assistant/main.rs"
 required-features = ["reqwest-blocking"]
@@ -36,3 +41,5 @@ reedline = "0.35"
 crossterm = "0.28"
 chrono = { version = "0.4", features = ["serde"] }
 toml = "0.8"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+reqwest-eventsource = "0.6.0"
