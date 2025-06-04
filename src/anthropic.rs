@@ -503,22 +503,16 @@ impl StreamedResponse {
 
     /// Handle a streaming event with the given event type and data.
     ///
-    /// According to the Anthropic API specification, events are sent as Server-Sent Events (SSE)
-    /// with an event type and JSON data.
-    ///
-    /// The optional `id` parameter can be used to track which stream this event belongs to
-    /// when handling multiple concurrent streams.
+    /// Arguments passed in should be the raw values decoded from the SSE stream.
     pub fn handle_event(
         &mut self,
         event: &[u8],
         data: &[u8],
-        id: Option<&str>,
     ) -> Result<StreamEvent, serde_json::Error> {
-        let event_str = std::str::from_utf8(event).unwrap_or("");
         let data_str = std::str::from_utf8(data).unwrap_or("");
 
-        match event_str {
-            "message_start" => {
+        match event {
+            b"message_start" => {
                 #[derive(Deserialize)]
                 struct MessageStartData {
                     message: MessagesResponse,
@@ -526,7 +520,7 @@ impl StreamedResponse {
                 let parsed: MessageStartData = serde_json::from_str(data_str)?;
                 Ok(StreamEvent::MessageStart(parsed.message))
             }
-            "content_block_start" => {
+            b"content_block_start" => {
                 #[derive(Deserialize)]
                 struct ContentBlockStartData {
                     index: u32,
@@ -538,7 +532,7 @@ impl StreamedResponse {
                     content_block: parsed.content_block,
                 })
             }
-            "content_block_delta" => {
+            b"content_block_delta" => {
                 #[derive(Deserialize)]
                 struct ContentBlockDeltaData {
                     index: u32,
@@ -550,7 +544,7 @@ impl StreamedResponse {
                     delta: parsed.delta,
                 })
             }
-            "content_block_stop" => {
+            b"content_block_stop" => {
                 #[derive(Deserialize)]
                 struct ContentBlockStopData {
                     index: u32,
@@ -560,7 +554,7 @@ impl StreamedResponse {
                     index: parsed.index,
                 })
             }
-            "message_delta" => {
+            b"message_delta" => {
                 #[derive(Deserialize)]
                 struct MessageDeltaData {
                     delta: MessageDelta,
@@ -572,9 +566,9 @@ impl StreamedResponse {
                     usage: parsed.usage,
                 })
             }
-            "message_stop" => Ok(StreamEvent::MessageStop),
-            "ping" => Ok(StreamEvent::Ping),
-            "error" => {
+            b"message_stop" => Ok(StreamEvent::MessageStop),
+            b"ping" => Ok(StreamEvent::Ping),
+            b"error" => {
                 #[derive(Deserialize)]
                 struct ErrorData {
                     error: ApiError,
@@ -586,6 +580,7 @@ impl StreamedResponse {
             }
             _ => {
                 // Handle unknown events gracefully as per the API specification
+                let event_str = std::str::from_utf8(event).unwrap_or("");
                 Ok(StreamEvent::Unknown {
                     event_type: event_str.to_string(),
                     data: data_str.to_string(),
@@ -605,7 +600,7 @@ mod streaming_tests {
         let event = b"ping";
         let data = b"{}";
 
-        let result = streamed.handle_event(event, data, None).unwrap();
+        let result = streamed.handle_event(event, data).unwrap();
         match result {
             StreamEvent::Ping => (),
             _ => panic!("Expected Ping event"),
@@ -618,7 +613,7 @@ mod streaming_tests {
         let event = b"message_stop";
         let data = b"{}";
 
-        let result = streamed.handle_event(event, data, None).unwrap();
+        let result = streamed.handle_event(event, data).unwrap();
         match result {
             StreamEvent::MessageStop => (),
             _ => panic!("Expected MessageStop event"),
@@ -631,7 +626,7 @@ mod streaming_tests {
         let event = b"content_block_delta";
         let data = br#"{"index": 0, "delta": {"type": "text_delta", "text": "Hello"}}"#;
 
-        let result = streamed.handle_event(event, data, None).unwrap();
+        let result = streamed.handle_event(event, data).unwrap();
         match result {
             StreamEvent::ContentBlockDelta { index, delta } => {
                 assert_eq!(index, 0);
@@ -650,7 +645,7 @@ mod streaming_tests {
         let event = b"unknown_event_type";
         let data = b"some data";
 
-        let result = streamed.handle_event(event, data, None).unwrap();
+        let result = streamed.handle_event(event, data).unwrap();
         match result {
             StreamEvent::Unknown { event_type, data } => {
                 assert_eq!(event_type, "unknown_event_type");
