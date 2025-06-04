@@ -3,7 +3,7 @@
 //! ## How to run
 //!
 //! ```shell
-//! $ cargo run --example streaming --features reqwest-blocking -- config.toml
+//! $ cargo run --example streaming --features reqwest -- config.toml
 //! ```
 //!
 //! Requires a TOML configuration file with your Anthropic API key.
@@ -12,13 +12,12 @@
 
 use std::{
     env, fs,
-    io::{self, Read, Write},
+    io::{self, Write},
 };
 
-use klaus::{
-    anthropic::{Message, MessagesResponse, Role},
-    deserialize_response,
-};
+use futures::stream::StreamExt;
+use klaus::anthropic::{Message, Role};
+use reqwest_eventsource::{Event, EventSource};
 use serde::Deserialize;
 
 /// Configuration structure for simple chat.
@@ -30,14 +29,14 @@ struct Config {
 }
 
 #[tokio::main]
-fn main() {
+async fn main() {
     // Read config from first command line argument, panic if not provided.
     let config_file = env::args()
         .skip(1)
         .next()
         .expect("requires argument: path to TOML config file");
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
 
     // Load configuration from TOML file
     let config_content = fs::read_to_string(&config_file).expect("failed to read config file");
@@ -50,40 +49,51 @@ fn main() {
     while let Some(input) = read_next_line() {
         messages.push_back(Message::from_text(Role::User, input));
 
-        // // Build the request, then send it.
+        // Build the request, then send it.
         let http_req = klaus::MessagesRequestBuilder::new()
             .set_messages(messages.clone())
             .stream(true)
             .build(&api);
 
-        dbg!(&http_req);
+        println!("Sending request...");
 
-        let mut response = client
-            .execute(http_req.into())
-            .expect("failed to execute request");
+        // Create RequestBuilder directly from HttpRequest data
+        let url = format!("https://{}{}", http_req.host, http_req.path);
+        let method = reqwest::Method::from_bytes(http_req.method.as_bytes()).unwrap();
 
-        dbg!(&response);
+        let mut request_builder = client.request(method, &url).body(http_req.body.clone());
 
-        let mut buf = Box::new([0u8; 4096]);
-        loop {
-            let bytes_read = response.read(&mut buf[..]).expect("read error");
-            if bytes_read == 0 {
-                break;
-            }
-            let data = &buf[..bytes_read];
-
-            println!("GOT CHUNK\n{}", str::from_utf8(data).unwrap());
+        // Add headers
+        for (key, value) in &http_req.headers {
+            request_builder = request_builder.header(*key, value.as_ref());
         }
 
-        // // Parse the response, then display and store it.
-        // let response: MessagesResponse =
-        //     deserialize_response(&raw).expect("failed to parse response");
+        let mut es = EventSource::new(request_builder).expect("failed to create event source");
 
-        // for content in &response.message {
-        //     println!("Claude: {}", content);
-        // }
+        println!("Receiving events:");
+        while let Some(event) = es.next().await {
+            match event {
+                Ok(Event::Open) => {
+                    println!("Connection opened");
+                }
+                Ok(Event::Message(message)) => {
+                    println!("Event: {}", message.event);
+                    println!("Data: {}", message.data);
+                    // TODO: Parse the SSE message data and handle different event types
+                    // TODO: For message_delta events, extract text content and accumulate
+                    // TODO: For message_stop events, finalize the response
+                }
+                Err(err) => {
+                    println!("Error: {}", err);
+                    break;
+                }
+            }
+        }
 
-        // messages.push_back(response.message);
+        println!("Stream ended\n");
+
+        // TODO: After processing all events, add the complete assistant message to messages
+        // messages.push_back(assistant_message);
     }
 }
 
