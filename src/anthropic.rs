@@ -457,12 +457,12 @@ pub struct StreamingUsage {
     pub output_tokens: Option<u32>,
 }
 
-/// A message start event from the streaming API.
+/// A message from the streaming API.
 ///
 /// This has a different structure from MessagesResponse since the streaming API
 /// has nullable fields that get filled in during the stream.
 #[derive(Debug, Deserialize)]
-pub struct StreamingMessageStart {
+pub struct StreamingMessage {
     /// The ID of the response.
     pub id: String,
     /// The model used to generate the response.
@@ -479,6 +479,18 @@ pub struct StreamingMessageStart {
     pub content: Vec<Content>,
 }
 
+impl StreamingMessage {
+    /// Update this message with a delta from a MessageDelta event.
+    pub fn update(&mut self, delta: MessageDelta) {
+        if let Some(stop_reason) = delta.stop_reason {
+            self.stop_reason = Some(stop_reason);
+        }
+        if let Some(stop_sequence) = delta.stop_sequence {
+            self.stop_sequence = Some(stop_sequence);
+        }
+    }
+}
+
 /// Decoded event from the streaming API.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -486,7 +498,7 @@ pub enum StreamEvent {
     /// Start of a message.
     ///
     /// The content of the message will be empty.
-    MessageStart { message: StreamingMessageStart },
+    MessageStart { message: StreamingMessage },
     /// Start of a content block.
     ContentBlockStart { index: u32, content_block: Content },
     /// Delta update to a content block.
@@ -525,7 +537,31 @@ pub enum Delta {
 }
 
 /// Delta updates to the message itself.
-#[derive(Debug, Deserialize)]
+///
+/// # Example
+///
+/// ```
+/// use klaus::anthropic::{StreamingMessage, MessageDelta, StopReason, Role, Usage};
+///
+/// let mut message = StreamingMessage {
+///     id: "msg_123".to_string(),
+///     model: "claude-test".to_string(),
+///     stop_reason: None,
+///     stop_sequence: None,
+///     usage: Usage { input_tokens: 10, output_tokens: 5 },
+///     role: Role::Assistant,
+///     content: vec![],
+/// };
+///
+/// let delta = MessageDelta {
+///     stop_reason: Some(StopReason::EndTurn),
+///     stop_sequence: None,
+/// };
+///
+/// message.update(delta);
+/// assert_eq!(message.stop_reason, Some(StopReason::EndTurn));
+/// ```
+#[derive(Debug, Deserialize, Clone)]
 pub struct MessageDelta {
     pub stop_reason: Option<StopReason>,
     pub stop_sequence: Option<String>,
@@ -559,7 +595,7 @@ mod tests {
         let result = crate::deserialize_event(data).unwrap();
         match result {
             StreamEvent::MessageStart { message } => {
-                // Now properly deserializes with the new StreamingMessageStart type
+                // Now properly deserializes with the new StreamingMessage type
                 assert_eq!(message.id, "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY");
                 assert_eq!(message.model, "claude-opus-4-20250514");
                 assert_eq!(message.stop_reason, None); // nullable in streaming
