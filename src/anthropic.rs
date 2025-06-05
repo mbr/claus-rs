@@ -445,6 +445,28 @@ pub struct Usage {
     pub output_tokens: u32,
 }
 
+/// A message start event from the streaming API.
+///
+/// This has a different structure from MessagesResponse since the streaming API
+/// has nullable fields that get filled in during the stream.
+#[derive(Debug, Deserialize)]
+pub struct StreamingMessageStart {
+    /// The ID of the response.
+    pub id: String,
+    /// The model used to generate the response.
+    pub model: String,
+    /// The reason the response was stopped (initially null).
+    pub stop_reason: Option<StopReason>,
+    /// The sequence that caused the response to be stopped (initially null).
+    pub stop_sequence: Option<String>,
+    /// The usage statistics for the request.
+    pub usage: Usage,
+    /// The role of the message.
+    pub role: Role,
+    /// The contents of the message (initially empty).
+    pub content: Vec<Content>,
+}
+
 /// Decoded event from the streaming API.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -452,7 +474,7 @@ pub enum StreamEvent {
     /// Start of a message.
     ///
     /// The content of the message will be empty.
-    MessageStart(MessagesResponse),
+    MessageStart { message: StreamingMessageStart },
     /// Start of a content block.
     ContentBlockStart { index: u32, content_block: Content },
     /// Delta update to a content block.
@@ -519,20 +541,24 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_unknown_event() {
-        let data = br#"{"type": "unknown_event_type", "data": "some data"}"#;
+    fn test_deserialize_message_start() {
+        let data = br#"{"type": "message_start", "message": {"id": "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY", "type": "message", "role": "assistant", "content": [], "model": "claude-opus-4-20250514", "stop_reason": null, "stop_sequence": null, "usage": {"input_tokens": 25, "output_tokens": 1}}}"#;
 
         let result = crate::deserialize_event(data).unwrap();
         match result {
-            StreamEvent::Unknown {
-                event_type,
-                contents,
-            } => {
-                assert_eq!(event_type, b"unknown_event_type");
-                assert_eq!(contents["data"], "some data");
-                assert_eq!(contents["type"], "unknown_event_type");
+            StreamEvent::MessageStart { message } => {
+                // Now properly deserializes with the new StreamingMessageStart type
+                assert_eq!(message.id, "msg_1nZdL29xx5MUA1yADyHTEsnR8uuvGzszyY");
+                assert_eq!(message.model, "claude-opus-4-20250514");
+                assert_eq!(message.stop_reason, None); // nullable in streaming
+                assert_eq!(message.stop_sequence, None); // nullable in streaming
+                assert_eq!(message.usage.input_tokens, 25);
+                assert_eq!(message.usage.output_tokens, 1);
+                assert!(message.content.is_empty());
             }
-            _ => panic!("Expected Unknown event"),
+            other => {
+                panic!("Expected MessageStart event, but got: {:?}", other);
+            }
         }
     }
 }

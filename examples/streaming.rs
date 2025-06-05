@@ -74,7 +74,7 @@ async fn main() {
                     // Parse the SSE message data using our deserialize_event function
                     match klaus::deserialize_event(message.data.as_bytes()) {
                         Ok(stream_event) => match stream_event {
-                            StreamEvent::MessageStart(_) => {
+                            StreamEvent::MessageStart { message: _ } => {
                                 print!("Assistant: ");
                                 io::stdout().flush().expect("failed to flush stdout");
                             }
