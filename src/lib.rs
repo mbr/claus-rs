@@ -303,23 +303,16 @@ pub fn deserialize_event(data: &[u8]) -> Result<anthropic::StreamEvent, serde_js
     match serde_json::from_slice(data) {
         Ok(event) => Ok(event),
         Err(original_error) => {
-            // If that fails, try to extract just the type and full contents for unknown events
-            #[derive(serde::Deserialize)]
-            struct UnknownEventHelper {
-                #[serde(rename = "type")]
-                event_type: String,
-            }
+            // If that fails, try to parse as a generic Value and extract the type
+            let contents: serde_json::Value = serde_json::from_slice(data)?;
 
-            match serde_json::from_slice::<UnknownEventHelper>(data) {
-                Ok(helper) => {
-                    // Parse the full JSON as a Value to preserve all fields
-                    let contents: serde_json::Value = serde_json::from_slice(data)?;
-                    Ok(anthropic::StreamEvent::Unknown {
-                        event_type: helper.event_type.into_bytes(),
-                        contents,
-                    })
-                }
-                Err(_e) => Err(original_error),
+            if let Some(event_type) = contents.get("type").and_then(|v| v.as_str()) {
+                Ok(anthropic::StreamEvent::Unknown {
+                    event_type: event_type.as_bytes().to_vec(),
+                    contents,
+                })
+            } else {
+                Err(original_error)
             }
         }
     }
