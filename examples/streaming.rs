@@ -18,7 +18,7 @@ use std::{
 };
 
 use futures::stream::StreamExt;
-use klaus::anthropic::{Content, Delta, Message, Role, StreamEvent};
+use klaus::anthropic::{Content, Delta, Message, Role, StreamEvent, StreamingMessage};
 use reqwest_eventsource::{Event, EventSource};
 use serde::Deserialize;
 
@@ -64,19 +64,21 @@ async fn main() {
 
         let mut assistant_content = Vec::new();
         let mut current_text = String::new();
+        let mut streaming_message: Option<StreamingMessage> = None;
 
         while let Some(event) = es.next().await {
             match event {
                 Ok(Event::Open) => {
-                    eprintln!("Connection opened");
+                    // Nothing to do here.
                 }
                 Ok(Event::Message(message)) => {
                     // Parse the SSE message data using our deserialize_event function
                     match klaus::deserialize_event(message.data.as_bytes()) {
                         Ok(stream_event) => match stream_event {
-                            StreamEvent::MessageStart { message: _ } => {
+                            StreamEvent::MessageStart { message } => {
                                 print!("Assistant: ");
                                 io::stdout().flush().expect("failed to flush stdout");
+                                streaming_message = Some(message);
                             }
                             StreamEvent::ContentBlockStart {
                                 index: _,
@@ -118,12 +120,19 @@ async fn main() {
                                     current_text.clear();
                                 }
                             }
-                            StreamEvent::MessageDelta { delta, usage } => {
-                                // We currently don't handle message deltas.
-                                eprintln!("Message delta: {:?}, usage: {:?}", delta, usage);
+                            StreamEvent::MessageDelta { delta, usage: _ } => {
+                                // Apply the delta to our streaming message. Note that we don't
+                                // use the usage information at all, this is just a demonstration
+                                // of how to update the message.
+                                if let Some(ref mut msg) = streaming_message {
+                                    msg.update(delta);
+                                } else {
+                                    eprintln!(
+                                        "Received MessageDelta but no streaming message available"
+                                    );
+                                }
                             }
                             StreamEvent::MessageStop => {
-                                // Finalize the response and break out of the event loop
                                 println!();
                                 break;
                             }
