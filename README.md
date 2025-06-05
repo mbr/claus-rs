@@ -8,7 +8,6 @@ Klaus is set apart by a few features from many other implementations:
 * **I/O-less**: Klaus itself does not perform any I/O, i.e., it does not make any HTTP requests and all of its methods are pure functions. This makes it HTTP client framework agnostic by default, although it contains convenience functions for some.
 * **Efficient**: Uses data structures from the [`im`] crate for efficient sharing and cloning of conversation history without deep copying.
 
-
 ## Basic Usage
 
 On the lowest layer sits an [`Api`] struct, which represents the configuration for making requests. You will need [an API key](https://console.anthropic.com/settings/keys) to utilize it. Once it is set up, you can create calls to the API through the [`MessagesRequestBuilder`]:
@@ -71,3 +70,8 @@ for item in action.contents {
     println!("Assistant: {}", item);
 }
 ```
+
+## Streaming
+
+The streaming API is supported as well, although not in conversations. See
+[`examples/streaming.rs`] for a demonstration on how to use it.
