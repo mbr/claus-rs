@@ -46,8 +46,7 @@ struct Config {
 /// Main entry point for the AI assistant application.
 fn main() -> io::Result<()> {
     let config_file = env::args()
-        .skip(1)
-        .next()
+        .nth(1)
         .expect("requires argument: path to TOML config file with API keys");
 
     // Load configuration from TOML file

@@ -35,8 +35,7 @@ struct Config {
 fn main() {
     // Read config from first command line argument, panic if not provided.
     let config_file = env::args()
-        .skip(1)
-        .next()
+        .nth(1)
         .expect("requires argument: path to TOML config file");
 
     let client = reqwest::blocking::Client::new();

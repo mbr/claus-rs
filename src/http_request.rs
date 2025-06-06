@@ -182,9 +182,7 @@ mod tests {
         };
 
         // Convert to reqwest::Request
-        let reqwest_request: reqwest::Request = http_request
-            .try_into()
-            .expect("should convert successfully");
+        let reqwest_request: reqwest::Request = http_request.into();
 
         assert_eq!(reqwest_request.method(), &reqwest::Method::POST);
         assert_eq!(
@@ -227,9 +225,7 @@ mod tests {
         };
 
         // Convert to reqwest::blocking::Request
-        let reqwest_request: reqwest::blocking::Request = http_request
-            .try_into()
-            .expect("should convert successfully");
+        let reqwest_request: reqwest::blocking::Request = http_request.into();
 
         assert_eq!(reqwest_request.method(), &reqwest::Method::POST);
         assert_eq!(

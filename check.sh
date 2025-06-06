@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 export RUSTFLAGS="-D warnings"
 
 ./format.sh --check
