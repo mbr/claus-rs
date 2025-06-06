@@ -6,6 +6,8 @@ authors = ["Marc Brinkmann <git@marcbrinkmann.de>"]
 description = "A I/O less Anthropic API implementation"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+repository = "https://github.com/mbr/klaus-rs"
+documentation = "https://docs.rs/klaus"
 
 [features]
 default = []
