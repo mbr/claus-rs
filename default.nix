@@ -26,4 +26,12 @@ platform.buildRustPackage rec {
   cargoLock = {
     lockFile = ./Cargo.lock;
   };
+
+  buildInputs = with pkgs; [
+    openssl
+  ];
+
+  nativeBuildInputs = with pkgs; [
+    pkg-config
+  ];
 }
