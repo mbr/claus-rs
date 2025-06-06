@@ -289,8 +289,8 @@ where
 /// # Example
 ///
 /// ```
-/// # use klaus::deserialize_event;
-/// # use klaus::anthropic::StreamEvent;
+/// # use claus::deserialize_event;
+/// # use claus::anthropic::StreamEvent;
 /// let json = br#"{"type": "ping"}"#;
 /// let event: StreamEvent = deserialize_event(json).unwrap();
 /// match event {

@@ -1,11 +1,11 @@
-# Klaus
+# claus
 
-Klaus is a client crate for [Anthropic's API](https://www.anthropic.com/api), which is often known only as "the Claude API". It allows having "conversations" with a hosted version of the latest Claude [large language models](https://en.wikipedia.org/wiki/Large_language_model).
+claus is a client crate for [Anthropic's API](https://www.anthropic.com/api), which is often known only as "the Claude API". It allows having "conversations" with a hosted version of the latest Claude [large language models](https://en.wikipedia.org/wiki/Large_language_model).
 
-Klaus is set apart by a few features from many other implementations:
+claus is set apart by a few features from many other implementations:
 
 * **Layered**: Direct access to API "primitives" is possible; all functionality is built on top of a set of data types covering a large portion of the API.
-* **I/O-less**: Klaus itself does not perform any I/O, i.e., it does not make any HTTP requests and all of its methods are pure functions. This makes it HTTP client framework agnostic by default, although it contains convenience functions for some.
+* **I/O-less**: claus itself does not perform any I/O, i.e., it does not make any HTTP requests and all of its methods are pure functions. This makes it HTTP client framework agnostic by default, although it contains convenience functions for some.
 * **Efficient**: Uses data structures from the [`im`] crate for efficient sharing and cloning of conversation history without deep copying.
 
 ## Basic Usage
@@ -13,9 +13,9 @@ Klaus is set apart by a few features from many other implementations:
 On the lowest layer sits an [`Api`] struct, which represents the configuration for making requests. You will need [an API key](https://console.anthropic.com/settings/keys) to utilize it. Once it is set up, you can create calls to the API through the [`MessagesRequestBuilder`]:
 
 ```rust
-use klaus::{Api, MessagesRequestBuilder};
-use klaus::anthropic::Role;
-use klaus::http_request::HttpRequest;
+use claus::{Api, MessagesRequestBuilder};
+use claus::anthropic::Role;
+use claus::http_request::HttpRequest;
 
 let api = Api::new("sk-ant-api03-...");
 
@@ -54,7 +54,7 @@ Calling the Anthropic API means sending the entire conversation every time a req
 For conversation management, you can use the [`conversation::Conversation`] type:
 
 ```rust,no_run
-use klaus::{Api, conversation::Conversation};
+use claus::{Api, conversation::Conversation};
 
 let api = Api::new("sk-ant-api03-...");
 let mut conversation = Conversation::new();

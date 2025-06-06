@@ -22,7 +22,7 @@
 //! ## Example
 //!
 //! ```no_run
-//! use klaus::{Api, conversation::Conversation};
+//! use claus::{Api, conversation::Conversation};
 //!
 //! let api = Api::new("sk-ant-api03-...");
 //! let mut conversation = Conversation::new();

@@ -1,6 +1,6 @@
 //! A full-featured AI assistant example demonstrating web search, page fetching, and datetime tools.
 //!
-//! This example showcases a complete CLI application that uses the klaus library to create
+//! This example showcases a complete CLI application that uses the claus library to create
 //! an interactive chat interface with Claude, equipped with multiple tools for enhanced
 //! functionality. Both API keys are configured via a TOML configuration file.
 //!
@@ -25,7 +25,7 @@ mod ui;
 
 use std::{env, fs, io};
 
-use klaus::anthropic::{Content, Tool, ToolResult, ToolUse};
+use claus::anthropic::{Content, Tool, ToolResult, ToolUse};
 use reqwest::blocking::{Client, Request};
 use serde::Deserialize;
 use tools::{
@@ -54,13 +54,13 @@ fn main() -> io::Result<()> {
     let config: Config = toml::from_str(&config_content).expect("failed to parse config TOML");
 
     // Setup API.
-    let api = klaus::Api::new(config.anthropic_api_key);
+    let api = claus::Api::new(config.anthropic_api_key);
 
     // Setup HTTP client.
     let client = Client::new();
 
     // Create the conversation instance.
-    let mut conversation = klaus::conversation::Conversation::new();
+    let mut conversation = claus::conversation::Conversation::new();
     conversation.set_system("You are a helpful personal assistant. You are able to answer questions, search the web, and help with tasks.");
     conversation.add_tool(Tool::new::<WebSearchInput, _, _>(
         "web_search",

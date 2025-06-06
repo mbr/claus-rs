@@ -108,7 +108,7 @@ impl<'a> IntoIterator for &'a Message {
 /// # Example
 ///
 /// ```
-/// use klaus::anthropic::Tool;
+/// use claus::anthropic::Tool;
 /// use schemars::JsonSchema;
 /// use serde_json;
 ///
@@ -541,7 +541,7 @@ pub enum Delta {
 /// # Example
 ///
 /// ```
-/// use klaus::anthropic::{StreamingMessage, MessageDelta, StopReason, Role, Usage};
+/// use claus::anthropic::{StreamingMessage, MessageDelta, StopReason, Role, Usage};
 ///
 /// let mut message = StreamingMessage {
 ///     id: "msg_123".to_string(),

@@ -1,4 +1,4 @@
-# Configuration file for the Klaus examples
+# Configuration file for the claus examples
 # Copy this file to config.toml and replace the placeholder values with your actual API keys
 
 # Your Anthropic API key for Claude access (REQUIRED for all examples)

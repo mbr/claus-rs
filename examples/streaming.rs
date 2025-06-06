@@ -17,8 +17,8 @@ use std::{
     io::{self, Write},
 };
 
+use claus::anthropic::{Content, Delta, Message, Role, StreamEvent, StreamingMessage};
 use futures::stream::StreamExt;
-use klaus::anthropic::{Content, Delta, Message, Role, StreamEvent, StreamingMessage};
 use reqwest_eventsource::{Event, EventSource};
 use serde::Deserialize;
 
@@ -43,14 +43,14 @@ async fn main() {
     let config_content = fs::read_to_string(&config_file).expect("failed to read config file");
     let config: Config = toml::from_str(&config_content).expect("failed to parse config TOML");
 
-    let api = klaus::Api::new(config.anthropic_api_key);
+    let api = claus::Api::new(config.anthropic_api_key);
 
     let mut messages = im::Vector::new();
     while let Some(input) = read_next_line() {
         messages.push_back(Message::from_text(Role::User, input));
 
         // Build the request, then send it.
-        let http_req = klaus::MessagesRequestBuilder::new()
+        let http_req = claus::MessagesRequestBuilder::new()
             .set_messages(messages.clone())
             .stream(true)
             .build(&api);
@@ -72,7 +72,7 @@ async fn main() {
                 }
                 Ok(Event::Message(message)) => {
                     // Parse the SSE message data using our deserialize_event function
-                    match klaus::deserialize_event(message.data.as_bytes()) {
+                    match claus::deserialize_event(message.data.as_bytes()) {
                         Ok(stream_event) => match stream_event {
                             StreamEvent::MessageStart { message } => {
                                 print!("Assistant: ");

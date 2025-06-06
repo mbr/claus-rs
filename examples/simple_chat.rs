@@ -18,7 +18,7 @@ use std::{
     io::{self, Write},
 };
 
-use klaus::{
+use claus::{
     anthropic::{Message, MessagesResponse, Role},
     deserialize_response,
 };
@@ -44,7 +44,7 @@ fn main() {
     let config_content = fs::read_to_string(&config_file).expect("failed to read config file");
     let config: Config = toml::from_str(&config_content).expect("failed to parse config TOML");
 
-    let api = klaus::Api::new(config.anthropic_api_key);
+    let api = claus::Api::new(config.anthropic_api_key);
 
     // Messages will hold our conversation, it will include both user messages and model responses.
     let mut messages = im::Vector::new();
@@ -52,7 +52,7 @@ fn main() {
         messages.push_back(Message::from_text(Role::User, input));
 
         // Build the request, then send it.
-        let http_req = klaus::MessagesRequestBuilder::new()
+        let http_req = claus::MessagesRequestBuilder::new()
             .set_messages(messages.clone())
             .build(&api);
         let raw = client

@@ -27,7 +27,7 @@ pub fn create_editor() -> Reedline {
 
 /// Returns the next user input, returning `None` if the program should exit.
 pub fn get_user_input(
-    conversation: &klaus::conversation::Conversation,
+    conversation: &claus::conversation::Conversation,
     line_editor: &mut Reedline,
 ) -> Option<String> {
     let prompt = DefaultPrompt::new(
