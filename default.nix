@@ -5,7 +5,13 @@ let
     url = "https://github.com/nix-community/fenix";
     rev = "c3c27e603b0d9b5aac8a16236586696338856fbb";
   }) { };
-  toolchain = fenix.stable.toolchain;
+  toolchain = fenix.stable.withComponents [
+    "cargo"
+    "clippy"
+    "rust-src"
+    "rustc"
+    "rustfmt"
+  ];
   platform = (pkgs.makeRustPlatform {
     cargo = toolchain;
     rustc = toolchain;
