@@ -8,6 +8,8 @@ claus is set apart by a few features from many other implementations:
 * **I/O-less**: claus itself does not perform any I/O, i.e., it does not make any HTTP requests and all of its methods are pure functions. This makes it HTTP client framework agnostic by default, although it contains convenience functions for some.
 * **Efficient**: Uses data structures from the [`im`] crate for efficient sharing and cloning of conversation history without deep copying.
 
+For a full-featured example on how to use it, see [`examples/agent/main.rs`](examples/agent/main.rs).
+
 ## Basic Usage
 
 On the lowest layer sits an [`Api`] struct, which represents the configuration for making requests. You will need [an API key](https://console.anthropic.com/settings/keys) to utilize it. Once it is set up, you can create calls to the API through the [`MessagesRequestBuilder`]:
