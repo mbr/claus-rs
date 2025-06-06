@@ -74,4 +74,4 @@ for item in action.contents {
 ## Streaming
 
 The streaming API is supported as well, although not in conversations. See
-[`examples/streaming.rs`] for a demonstration on how to use it.
+[`examples/streaming.rs`](examples/streaming.rs) for a demonstration on how to use it.
