@@ -30,7 +30,7 @@ path = "examples/assistant/main.rs"
 required-features = ["reqwest-blocking"]
 
 [dependencies]
-reqwest = { version = "*", optional = true }
+reqwest = { version = "0.12.19", optional = true }
 im = { version = "15.1", features = ["serde"] }
 schemars = "0.8"
 serde = { version = "1.0.219", features = ["rc"] }
