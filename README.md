@@ -1,18 +1,30 @@
 # claus
 
-claus is a client crate for [Anthropic's API](https://www.anthropic.com/api), which is often known only as "the Claude API". It allows having "conversations" with a hosted version of the latest Claude [large language models](https://en.wikipedia.org/wiki/Large_language_model).
+claus is a client crate for [Anthropic's API](https://www.anthropic.com/api), which is often known only as "the Claude
+API". It allows having "conversations" with a hosted version of the latest
+Claude [large language models](https://en.wikipedia.org/wiki/Large_language_model).
 
 claus is set apart by a few features from many other implementations:
 
-* **Layered**: Direct access to API "primitives" is possible; all functionality is built on top of a set of data types covering a large portion of the API.
-* **I/O-less**: claus itself does not perform any I/O, i.e., it does not make any HTTP requests and all of its methods are pure functions. This makes it HTTP client framework agnostic by default, although it contains convenience functions for some.
-* **Efficient**: Uses data structures from the [`im`] crate for efficient sharing and cloning of conversation history without deep copying.
+* **Layered**: Direct access to API "primitives" is possible; all functionality is built on top of a set of data types
+  covering a large portion of the API.
+* **I/O-less**: claus itself does not perform any I/O, i.e., it does not make any HTTP requests and all of its methods
+  are pure functions. This makes it HTTP client framework agnostic by default, although it contains convenience
+  functions for some.
+* **Efficient**: Uses data structures from the [`im`] crate for efficient sharing and cloning of conversation history
+  without deep copying.
+
+## Assistant example
 
 For a full-featured example on how to use it, see [`examples/assistant/main.rs`](examples/assistant/main.rs).
 
+[![asciicast](https://private-user-images.githubusercontent.com/110577/478688582-543b799d-56d1-4028-bfad-fbd5d50ed3c2.gif?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTUzNTkxOTAsIm5iZiI6MTc1NTM1ODg5MCwicGF0aCI6Ii8xMTA1NzcvNDc4Njg4NTgyLTU0M2I3OTlkLTU2ZDEtNDAyOC1iZmFkLWZiZDVkNTBlZDNjMi5naWY_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUwODE2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MDgxNlQxNTQxMzBaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT04ZGI3MDM4NTkyMDdhMzQyYTMxZGU3ZWZmMWU1MDk3M2Q1NDRiN2UwNWVkZWQ5ZTY5MDc5ZTM4OGZiNjc4YjViJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.pbmyMCU8NoEmtfM7VzxAiEYhNZo29qfXXUpt9OoRiRE)](https://asciinema.org/a/DZjrOAoode4sTxJDd5gsknbZu)
+
 ## Basic Usage
 
-On the lowest layer sits an [`Api`] struct, which represents the configuration for making requests. You will need [an API key](https://console.anthropic.com/settings/keys) to utilize it. Once it is set up, you can create calls to the API through the [`MessagesRequestBuilder`]:
+On the lowest layer sits an [`Api`] struct, which represents the configuration for making requests. You will
+need [an API key](https://console.anthropic.com/settings/keys) to utilize it. Once it is set up, you can create calls to
+the API through the [`MessagesRequestBuilder`]:
 
 ```rust
 use claus::{Api, MessagesRequestBuilder};
