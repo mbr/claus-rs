@@ -183,9 +183,13 @@ pub fn send_request(client: &Client, req: Request) -> Result<String, String> {
 
             std::thread::sleep(std::time::Duration::from_secs(retry_after));
         } else {
-            let response = response
-                .error_for_status()
-                .map_err(|e| format!("Request failed: {}", e))?;
+            if !response.status().is_success() {
+                let status = response.status();
+                let text = response
+                    .text()
+                    .unwrap_or_else(|err| format!("(failed to fetch response text: {})", err));
+                return Err(format!("Request failed with HTTP {}: {}", status, text));
+            }
             let body = response
                 .text()
                 .map_err(|e| format!("Failed to read response body: {}", e))?;
