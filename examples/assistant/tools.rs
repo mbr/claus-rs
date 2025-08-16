@@ -3,7 +3,7 @@
 //! This module provides all the tool implementations used by the assistant,
 //! including web search via Brave API, web page content fetching, and datetime retrieval.
 
-use std::fmt;
+use std::fmt::{self, Write};
 
 use chrono::{DateTime, Utc};
 use reqwest::{
@@ -15,6 +15,9 @@ use serde::{Deserialize, Serialize};
 
 /// Brave Search API endpoint
 const BRAVE_SEARCH_ENDPOINT: &str = "https://api.search.brave.com/res/v1/web/search";
+
+/// Length to truncate fetched webpages to, in characters.
+const SENSIBLE_TEXT_LENGTH: usize = 50_000;
 
 /// Input to the web search tool.
 #[derive(Debug, JsonSchema, Serialize, Deserialize)]
@@ -110,8 +113,29 @@ pub fn tool_web_search(
     Ok(results)
 }
 
-/// Fetches the content of a web page.
+/// Fetches the content of a web page and converts it to clean text.
+///
+/// Truncates if the fetched page exceeds [`SENSIBLE_TEXT_LENGTH`] *in bytes*.
 pub fn tool_fetch_page(client: &Client, url: &str) -> Result<String, String> {
     let request = Request::new(Method::GET, url.parse().expect("Failed to parse URL"));
-    super::send_request(client, request)
+    let html = super::send_request(client, request)?;
+
+    // Convert HTML to clean text with reasonable width for readability
+    let text = html2text::from_read(html.as_bytes(), 80)
+        .map_err(|e| format!("Failed to convert HTML to text: {}", e))?;
+
+    let mut truncated = text.chars().take(SENSIBLE_TEXT_LENGTH).collect::<String>();
+    let new_len = truncated.len();
+
+    if new_len != text.len() {
+        write!(
+            &mut truncated,
+            "\nTHIS PAGE WAS {} BYTES ORIGINALLY, TRUNCATED TO {}\n",
+            text.len(),
+            new_len
+        )
+        .expect("write to string should not fail");
+    }
+
+    Ok(truncated)
 }

@@ -72,7 +72,7 @@ fn main() -> io::Result<()> {
     ));
     conversation.add_tool(Tool::new::<FetchPageInput, _, _>(
         "fetch_page",
-        "Fetches the content of a web page. Use this tool to fetch the content of a web page. This is useful when the description of the result is not enough to answer the user's question. The page returned will be in HTML format. Sometimes the page may not have the information you need, in which case you should discard this result and continue with the next one.",
+        "Fetches the content of a web page. Use this tool to fetch the content of a web page. This is useful when the description of the result is not enough to answer the user's question. The page returned will be in Markdown, with all HTML removed, potentially truncated if it was too long. Sometimes the page may not have the information you need, in which case you should discard this result and continue with the next one.",
     ));
 
     // Set up reedline with custom keybindings
