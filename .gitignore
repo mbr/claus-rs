@@ -1,3 +1,4 @@
 # Configuration files with API keys
 config.toml
 target/
+result
