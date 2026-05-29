@@ -16,7 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::anthropic::{Content, Message, ServerToolUsage, StreamEvent, StreamingMessage};
+use crate::anthropic::{Content, Message, Role, ServerToolUsage, StreamEvent, StreamingMessage};
 
 /// Common envelope fields for Claude Code messages.
 ///
@@ -60,8 +60,6 @@ pub struct SystemMessage {
     pub subtype: String,
     /// Current working directory.
     pub cwd: String,
-    /// Session identifier.
-    pub session_id: String,
     /// Available tools.
     pub tools: Vec<String>,
     /// Configured MCP servers.
@@ -91,8 +89,9 @@ pub struct SystemMessage {
     /// Loaded plugins.
     #[serde(default)]
     pub plugins: Vec<String>,
-    /// Message UUID.
-    pub uuid: String,
+    /// Session metadata.
+    #[serde(flatten)]
+    pub envelope: Envelope,
 }
 
 /// MCP server status in system init.
@@ -159,8 +158,6 @@ pub struct ResultMessage {
     pub num_turns: u32,
     /// Final text result.
     pub result: Option<String>,
-    /// Session identifier.
-    pub session_id: String,
     /// Total cost in USD.
     #[serde(default)]
     pub total_cost_usd: f64,
@@ -172,8 +169,9 @@ pub struct ResultMessage {
     /// Permission denials during this turn.
     #[serde(default)]
     pub permission_denials: Vec<serde_json::Value>,
-    /// Message UUID.
-    pub uuid: String,
+    /// Session metadata.
+    #[serde(flatten)]
+    pub envelope: Envelope,
 }
 
 /// Token usage statistics in result message.
@@ -224,7 +222,7 @@ pub struct InputMessage {
     #[serde(rename = "type")]
     message_type: &'static str,
     /// The message content.
-    pub message: InputMessageInner,
+    pub message: Message,
 }
 
 impl InputMessage {
@@ -232,10 +230,7 @@ impl InputMessage {
     pub fn text(text: impl Into<String>) -> Self {
         Self {
             message_type: "user",
-            message: InputMessageInner {
-                role: "user",
-                content: vec![Content::Text { text: text.into() }],
-            },
+            message: Message::from_text(Role::User, text),
         }
     }
 
@@ -243,21 +238,12 @@ impl InputMessage {
     pub fn with_content(content: Vec<Content>) -> Self {
         Self {
             message_type: "user",
-            message: InputMessageInner {
-                role: "user",
+            message: Message {
+                role: Role::User,
                 content,
             },
         }
     }
-}
-
-/// Inner content of an input message.
-#[derive(Clone, Debug, Serialize)]
-pub struct InputMessageInner {
-    /// Role (always `"user"`).
-    role: &'static str,
-    /// Message content blocks.
-    pub content: Vec<Content>,
 }
 
 #[cfg(test)]
