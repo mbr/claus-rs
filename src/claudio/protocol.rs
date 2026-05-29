@@ -16,7 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::anthropic::{Content, ServerToolUsage, StreamEvent, StreamingMessage};
+use crate::anthropic::{Content, Message, ServerToolUsage, StreamEvent, StreamingMessage};
 
 /// Message from Claude Code stdout.
 ///
@@ -125,7 +125,7 @@ pub struct AssistantMessage {
 #[derive(Clone, Debug, Deserialize)]
 pub struct UserMessage {
     /// The user message content.
-    pub message: UserMessageInner,
+    pub message: Message,
     /// Session identifier.
     pub session_id: String,
     /// Parent tool use ID if this is a tool result.
@@ -135,15 +135,6 @@ pub struct UserMessage {
     /// Structured metadata about tool result (present when message contains a tool result).
     #[serde(default)]
     pub tool_use_result: Option<serde_json::Value>,
-}
-
-/// Inner content of a user message.
-#[derive(Clone, Debug, Deserialize)]
-pub struct UserMessageInner {
-    /// Role (always `user`).
-    pub role: String,
-    /// Message content blocks.
-    pub content: Vec<Content>,
 }
 
 /// Final result of a conversation turn.
@@ -388,12 +379,14 @@ mod tests {
 
     #[test]
     fn parse_user_tool_result() {
+        use crate::anthropic::Role;
+
         let json = r#"{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_01TV2WdLXaSZwBGgKGPvLEmy","type":"tool_result","content":"hello"}]},"parent_tool_use_id":null,"session_id":"bf7004a5-4781-4c4e-bd35-6f4516db86fd","uuid":"dfc99bb7-55dc-4829-87a8-e9fd6333f970","tool_use_result":{"type":"text","file":{"filePath":"/tmp/hello.txt"}}}"#;
 
         let msg: OutputMessage = serde_json::from_str(json).expect("parse");
         match msg {
             OutputMessage::User(user) => {
-                assert_eq!(user.message.role, "user");
+                assert_eq!(user.message.role, Role::User);
                 assert_eq!(user.message.content.len(), 1);
                 assert!(user.tool_use_result.is_some());
             }
