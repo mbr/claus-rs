@@ -512,11 +512,12 @@ impl CliBuilder {
         }
 
         if self.print {
-            cmd.arg("--print");
+            cmd.arg("-p");
         }
 
+        // Prompt is a positional argument, must come last
         if let Some(prompt) = &self.prompt {
-            cmd.arg("-p").arg(prompt);
+            cmd.arg(prompt);
         }
 
         if let Some(workdir) = &self.workdir {
@@ -544,7 +545,7 @@ mod tests {
         let args: Vec<_> = cmd.get_args().map(|s| s.to_str().unwrap()).collect();
         assert!(args.contains(&"--permission-mode"));
         assert!(args.contains(&"dontAsk"));
-        assert!(args.contains(&"--print"));
+        assert!(args.contains(&"-p"));
         assert!(args.contains(&"--output-format"));
         assert!(args.contains(&"stream-json"));
         assert!(args.contains(&"--verbose"));
@@ -596,12 +597,13 @@ mod tests {
 
         let args: Vec<_> = cmd.get_args().map(|s| s.to_str().unwrap()).collect();
         assert!(args.contains(&"-p"));
-        assert!(args.contains(&"Hello, world!"));
-        assert!(args.contains(&"--print"));
+        assert!(args.contains(&"Hello, world!")); // positional, at end
         assert!(args.contains(&"--max-turns"));
         assert!(args.contains(&"5"));
         assert!(args.contains(&"--allowedTools"));
         assert!(args.contains(&"Read"));
+        // Prompt should be last argument
+        assert_eq!(args.last(), Some(&"Hello, world!"));
     }
 
     #[test]
