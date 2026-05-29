@@ -264,8 +264,6 @@ impl HttpMcpServer {
 /// Builder for constructing a `claude` CLI command.
 #[derive(Clone, Debug, Default)]
 pub struct CliBuilder {
-    /// Working directory for the process.
-    workdir: Option<PathBuf>,
     /// Session ID for the conversation.
     #[cfg(feature = "uuid")]
     session_id: Option<uuid::Uuid>,
@@ -329,12 +327,6 @@ impl CliBuilder {
             allowed_tools: Vec::new(),
             ..Self::default()
         }
-    }
-
-    /// Sets the working directory for the process.
-    pub fn workdir(mut self, path: impl Into<PathBuf>) -> Self {
-        self.workdir = Some(path.into());
-        self
     }
 
     /// Sets the session ID for the conversation.
@@ -518,10 +510,6 @@ impl CliBuilder {
         // Prompt is a positional argument, must come last
         if let Some(prompt) = &self.prompt {
             cmd.arg(prompt);
-        }
-
-        if let Some(workdir) = &self.workdir {
-            cmd.current_dir(workdir);
         }
 
         cmd
