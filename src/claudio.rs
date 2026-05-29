@@ -15,6 +15,8 @@ pub enum PermissionMode {
     /// Auto-accept file edits, prompt for other tools.
     AcceptEdits,
     /// Allow all tools without prompts.
+    ///
+    /// Equivalent to `--dangerously-skip-permissions`.
     BypassPermissions,
     /// Delegate permission decisions to an MCP tool.
     Delegate,
@@ -256,8 +258,6 @@ pub struct CliBuilder {
     add_dirs: Vec<PathBuf>,
     /// Print mode (non-interactive).
     print: bool,
-    /// Skip permission prompts entirely.
-    dangerously_skip_permissions: bool,
 }
 
 impl CliBuilder {
@@ -375,14 +375,6 @@ impl CliBuilder {
         self
     }
 
-    /// Skips all permission prompts.
-    ///
-    /// Use with caution. This bypasses all safety checks for tool execution.
-    pub fn dangerously_skip_permissions(mut self, enabled: bool) -> Self {
-        self.dangerously_skip_permissions = enabled;
-        self
-    }
-
     /// Builds the configured command.
     ///
     /// Returns a [`Command`] with all arguments configured. The caller is responsible for setting
@@ -450,10 +442,6 @@ impl CliBuilder {
 
         if self.print {
             cmd.arg("--print");
-        }
-
-        if self.dangerously_skip_permissions {
-            cmd.arg("--dangerously-skip-permissions");
         }
 
         if let Some(prompt) = &self.prompt {
