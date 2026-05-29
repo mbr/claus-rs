@@ -480,6 +480,19 @@ impl CliBuilder {
     /// - `Some(["Read", "Bash"])` — only specified tools available
     /// - `None` — use default tool set
     ///
+    /// Built-in tools include:
+    /// - `Bash` — run shell commands
+    /// - `Read` — read file contents
+    /// - `Write` — create/overwrite files
+    /// - `Edit` — edit existing files
+    /// - `Glob` — find files by pattern
+    /// - `Grep` — search file contents
+    /// - `Task` — spawn subagents
+    /// - `WebFetch` — fetch web content
+    /// - `WebSearch` — search the web
+    /// - `NotebookEdit` — edit Jupyter notebooks
+    /// - `AskUserQuestion` — prompt the user for input
+    ///
     /// Different from [`allowed_tools`](Self::allowed_tools) which filters on top of available
     /// tools.
     pub fn tools<I, T>(mut self, tools: Option<I>) -> Self
