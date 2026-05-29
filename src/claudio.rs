@@ -4,6 +4,8 @@
 //! configures command-line arguments for session management, permissions, MCP servers, and I/O
 //! formats.
 
+pub mod protocol;
+
 use std::{collections::HashMap, path::PathBuf, process::Command};
 
 /// Joins an iterator of string-like items with commas.
