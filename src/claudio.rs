@@ -16,6 +16,7 @@ pub enum PermissionMode {
     ///
     /// Unsuitable for non-interactive use since the CLI may hang waiting for user input.
     /// Use [`DontAsk`](Self::DontAsk) for headless/CI environments.
+    #[default]
     Default,
     /// Auto-accept file edits, prompt for other tools.
     ///
@@ -38,7 +39,6 @@ pub enum PermissionMode {
     ///
     /// Recommended for CI pipelines and non-interactive use. Auto-denies anything that would
     /// prompt; only pre-approved tools and read-only Bash commands execute.
-    #[default]
     DontAsk,
     /// Exploration mode for research without edits.
     ///
@@ -305,6 +305,32 @@ impl CliBuilder {
         Self::default()
     }
 
+    /// Creates a builder configured for non-interactive use.
+    ///
+    /// Pre-configured with:
+    /// - [`PermissionMode::DontAsk`] to avoid hanging on permission prompts
+    /// - [`print`](Self::print) mode enabled for non-interactive output
+    /// - [`OutputFormat::StreamJson`] for structured, parseable output
+    /// - [`verbose`](Self::verbose) enabled (required for `StreamJson`)
+    /// - [`strict_mcp_config`](Self::strict_mcp_config) to ignore external MCP servers
+    /// - [`max_turns`](Self::max_turns) set to 1 (single response, no agentic loops)
+    /// - No allowed tools (caller must explicitly allow any tools needed)
+    ///
+    /// Suitable for CI pipelines, scripts, and automation. Caller must set
+    /// [`prompt`](Self::prompt) before building.
+    pub fn headless() -> Self {
+        Self {
+            permission_mode: PermissionMode::DontAsk,
+            print: true,
+            output_format: OutputFormat::StreamJson,
+            verbose: true,
+            strict_mcp_config: true,
+            max_turns: Some(1),
+            allowed_tools: Vec::new(),
+            ..Self::default()
+        }
+    }
+
     /// Sets the working directory for the process.
     pub fn workdir(mut self, path: impl Into<PathBuf>) -> Self {
         self.workdir = Some(path.into());
@@ -506,11 +532,27 @@ mod tests {
     use super::{CliBuilder, InputFormat, OutputFormat, PermissionMode, StdioMcpServer};
 
     #[test]
-    fn minimal_command_uses_dontask_by_default() {
+    fn minimal_command_has_no_args() {
         let cmd = CliBuilder::new().build();
+        let args: Vec<_> = cmd.get_args().collect();
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn headless_preset() {
+        let cmd = CliBuilder::headless().build();
         let args: Vec<_> = cmd.get_args().map(|s| s.to_str().unwrap()).collect();
         assert!(args.contains(&"--permission-mode"));
         assert!(args.contains(&"dontAsk"));
+        assert!(args.contains(&"--print"));
+        assert!(args.contains(&"--output-format"));
+        assert!(args.contains(&"stream-json"));
+        assert!(args.contains(&"--verbose"));
+        assert!(args.contains(&"--strict-mcp-config"));
+        assert!(args.contains(&"--max-turns"));
+        assert!(args.contains(&"1"));
+        // No --allowedTools since list is empty
+        assert!(!args.contains(&"--allowedTools"));
     }
 
     #[test]
@@ -584,5 +626,39 @@ mod tests {
         let config = args[config_idx + 1];
         assert!(config.contains("myserver"));
         assert!(config.contains("mycmd"));
+    }
+
+    /// Integration test that actually runs `claude` CLI.
+    ///
+    /// Run with: `cargo test --features uuid -- --ignored`
+    #[test]
+    #[ignore]
+    fn integration_headless_run() {
+        let output = CliBuilder::headless()
+            .prompt("Reply with exactly: PONG")
+            .build()
+            .output()
+            .expect("failed to execute claude");
+
+        assert!(output.status.success(), "claude exited with error");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        // Parse the last line as JSON (the result message)
+        let last_line = stdout.lines().last().expect("no output from claude");
+        let result: serde_json::Value =
+            serde_json::from_str(last_line).expect("failed to parse result JSON");
+
+        assert_eq!(result["type"], "result");
+        assert_eq!(result["subtype"], "success");
+        assert!(
+            result["result"]
+                .as_str()
+                .unwrap_or("")
+                .to_uppercase()
+                .contains("PONG"),
+            "expected PONG in result, got: {}",
+            result["result"]
+        );
     }
 }
