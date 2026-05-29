@@ -16,7 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::anthropic::{Content, StreamEvent, StreamingMessage};
+use crate::anthropic::{Content, ServerToolUsage, StreamEvent, StreamingMessage};
 
 /// Message from Claude Code stdout.
 ///
@@ -197,24 +197,13 @@ pub struct ResultUsage {
     pub output_tokens: u32,
     /// Server tool use statistics.
     #[serde(default)]
-    pub server_tool_use: ServerToolUse,
+    pub server_tool_use: ServerToolUsage,
     /// Service tier.
     #[serde(default)]
     pub service_tier: String,
     /// Cache creation breakdown.
     #[serde(default)]
     pub cache_creation: CacheCreation,
-}
-
-/// Server-side tool use statistics.
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct ServerToolUse {
-    /// Web search requests made.
-    #[serde(default)]
-    pub web_search_requests: u32,
-    /// Web fetch requests made.
-    #[serde(default)]
-    pub web_fetch_requests: u32,
 }
 
 /// Cache creation breakdown.

@@ -538,12 +538,16 @@ pub struct Usage {
 ///
 /// See <https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search-tool> for
 /// details.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ServerToolUsage {
     /// Number of web searches performed during this request.
     ///
     /// Bounded by the `max_uses` parameter if specified in the tool configuration.
+    #[serde(default)]
     pub web_search_requests: u32,
+    /// Number of web fetches performed during this request.
+    #[serde(default)]
+    pub web_fetch_requests: u32,
 }
 
 /// Token usage statistics for streaming responses.
