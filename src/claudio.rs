@@ -7,22 +7,43 @@
 use std::{collections::HashMap, path::PathBuf, process::Command};
 
 /// Permission mode for tool execution.
+///
+/// The CLI also reads permission settings from `~/.claude/settings.json` and project-level
+/// `.claude/settings.json` files.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PermissionMode {
     /// Standard permission behavior with prompts.
-    #[default]
+    ///
+    /// Unsuitable for non-interactive use since the CLI may hang waiting for user input.
+    /// Use [`DontAsk`](Self::DontAsk) for headless/CI environments.
     Default,
     /// Auto-accept file edits, prompt for other tools.
+    ///
+    /// Auto-approves reads, file edits, and common filesystem Bash commands (`mkdir`, `touch`,
+    /// `rm`, `rmdir`, `mv`, `cp`, `sed`). Other Bash commands and network requests still prompt.
     AcceptEdits,
     /// Allow all tools without prompts.
     ///
-    /// Equivalent to `--dangerously-skip-permissions`.
+    /// Equivalent to `--dangerously-skip-permissions`. Only use in isolated environments
+    /// (containers, VMs) without internet access.
     BypassPermissions,
     /// Delegate permission decisions to an MCP tool.
+    ///
+    /// Routes permission prompts to the MCP tool specified by
+    /// [`CliBuilder::permission_prompt_tool`]. The tool receives permission requests and must
+    /// return `{"behavior": "allow"}` or `{"behavior": "deny", "message": "..."}`. Useful for
+    /// implementing custom approval logic or organizational security policies.
     Delegate,
     /// Deny tools unless pre-approved via allowed tools, settings, or hooks.
+    ///
+    /// Recommended for CI pipelines and non-interactive use. Auto-denies anything that would
+    /// prompt; only pre-approved tools and read-only Bash commands execute.
+    #[default]
     DontAsk,
-    /// Exploration mode with no tool execution.
+    /// Exploration mode for research without edits.
+    ///
+    /// Claude can read files and run shell commands to explore, but cannot edit source files.
+    /// Permission prompts still apply as in [`Default`](Self::Default) mode.
     Plan,
 }
 
@@ -461,10 +482,11 @@ mod tests {
     use super::{CliBuilder, InputFormat, OutputFormat, PermissionMode, StdioMcpServer};
 
     #[test]
-    fn minimal_command() {
+    fn minimal_command_uses_dontask_by_default() {
         let cmd = CliBuilder::new().build();
-        let args: Vec<_> = cmd.get_args().collect();
-        assert!(args.is_empty());
+        let args: Vec<_> = cmd.get_args().map(|s| s.to_str().unwrap()).collect();
+        assert!(args.contains(&"--permission-mode"));
+        assert!(args.contains(&"dontAsk"));
     }
 
     #[test]
