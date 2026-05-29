@@ -79,7 +79,8 @@ pub enum OutputFormat {
     Json,
     /// Newline-delimited JSON stream.
     ///
-    /// Emits one JSON object per line as events occur.
+    /// Emits one JSON object per line as events occur. Required [`CliBuilder::verbose`]
+    /// to be set.
     // TODO: Explain how to parse the format here!
     StreamJson,
 }
