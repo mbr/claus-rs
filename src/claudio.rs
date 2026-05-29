@@ -62,14 +62,25 @@ impl PermissionMode {
 }
 
 /// Output format for the CLI.
+///
+/// Only applies when using [`CliBuilder::print`] mode.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum OutputFormat {
     /// Plain text output.
+    ///
+    /// Returns the final response as plain text. Best for simple scripting where you just need
+    /// the result.
     #[default]
     Text,
-    /// JSON output.
+    /// Single JSON result.
+    ///
+    /// Returns the final `result` message as a single JSON object - the same structure as the
+    /// last message in [`StreamJson`](Self::StreamJson).
     Json,
     /// Newline-delimited JSON stream.
+    ///
+    /// Emits one JSON object per line as events occur.
+    // TODO: Explain how to parse the format here!
     StreamJson,
 }
 
@@ -85,12 +96,18 @@ impl OutputFormat {
 }
 
 /// Input format for the CLI.
+///
+/// Only applies when using [`CliBuilder::print`] mode.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum InputFormat {
-    /// Plain text input.
+    /// Plain text input via `-p` flag or stdin.
     #[default]
     Text,
-    /// Newline-delimited JSON stream.
+    /// Newline-delimited JSON stream on stdin.
+    ///
+    /// Enables bidirectional communication for interactive sessions. Send messages as
+    /// `{"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "..."}]}}`
+    /// followed by a newline. Pair with [`OutputFormat::StreamJson`] for full duplex messaging.
     StreamJson,
 }
 
