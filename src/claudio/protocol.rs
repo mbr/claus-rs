@@ -16,7 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::anthropic::{Content, Role, StopReason, StreamEvent, Usage};
+use crate::anthropic::{Content, StreamEvent, StreamingMessage};
 
 /// Message from Claude Code stdout.
 ///
@@ -112,35 +112,13 @@ pub struct StreamEventMessage {
 #[derive(Debug, Deserialize)]
 pub struct AssistantMessage {
     /// The complete Anthropic message.
-    pub message: AssistantMessageInner,
+    pub message: StreamingMessage,
     /// Session identifier.
     pub session_id: String,
     /// Parent tool use ID if this is part of a tool execution.
     pub parent_tool_use_id: Option<String>,
     /// Message UUID.
     pub uuid: String,
-}
-
-/// Inner content of an assistant message.
-///
-/// Similar to [`crate::anthropic::MessagesResponse`] but with optional `stop_reason` for
-/// incomplete messages.
-#[derive(Debug, Deserialize)]
-pub struct AssistantMessageInner {
-    /// Message ID from the API.
-    pub id: String,
-    /// Model used for generation.
-    pub model: String,
-    /// Role (always `assistant`).
-    pub role: Role,
-    /// Message content blocks.
-    pub content: Vec<Content>,
-    /// Reason the model stopped generating.
-    pub stop_reason: Option<StopReason>,
-    /// Stop sequence that triggered completion, if any.
-    pub stop_sequence: Option<String>,
-    /// Token usage statistics.
-    pub usage: Usage,
 }
 
 /// Echoed user message or tool result.
