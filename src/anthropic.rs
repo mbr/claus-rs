@@ -585,12 +585,22 @@ pub struct StreamingMessage {
     pub stop_reason: Option<StopReason>,
     /// The sequence that caused the response to be stopped (initially null).
     pub stop_sequence: Option<String>,
+    /// Additional details when `stop_reason` is `Refusal`.
+    ///
+    /// Contains the refusal category and explanation.
+    #[serde(default)]
+    pub stop_details: Option<Value>,
     /// The usage statistics for the request.
     pub usage: Usage,
     /// The role of the message.
     pub role: Role,
     /// The contents of the message (initially empty).
     pub content: Vec<Content>,
+    /// Context management information (beta feature).
+    ///
+    /// Present when context editing strategies are applied in long conversations.
+    #[serde(default)]
+    pub context_management: Option<Value>,
 }
 
 impl StreamingMessage {
