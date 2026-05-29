@@ -6,6 +6,18 @@
 
 use std::{collections::HashMap, path::PathBuf, process::Command};
 
+/// Joins an iterator of string-like items with commas.
+fn join_args<I, T>(args: I) -> String
+where
+    I: IntoIterator<Item = T>,
+    T: AsRef<str>,
+{
+    args.into_iter()
+        .map(|s| s.as_ref().to_owned())
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 /// Permission mode for tool execution.
 ///
 /// The CLI also reads permission settings from `~/.claude/settings.json` and project-level
@@ -295,10 +307,10 @@ pub struct CliBuilder {
     max_turns: Option<u32>,
     /// Maximum budget in USD.
     max_budget_usd: Option<f64>,
-    /// Allowed tools (filter on top of available tools).
-    allowed_tools: Vec<String>,
-    /// Available built-in tools.
-    tools: Vec<String>,
+    /// Allowed tools (filter on top of available tools), comma-separated.
+    allowed_tools: Option<String>,
+    /// Available built-in tools, comma-separated.
+    tools: Option<String>,
     /// Additional directories to allow tool access.
     add_dirs: Vec<PathBuf>,
     /// Print mode (non-interactive).
@@ -325,7 +337,7 @@ impl CliBuilder {
     /// - [`strict_mcp_config`](Self::strict_mcp_config) to ignore external MCP servers
     /// - [`max_turns`](Self::max_turns) set to 1 (single response, no agentic loops)
     /// - [`no_session_persistence`](Self::no_session_persistence) to avoid writing session files
-    /// - No allowed tools (caller must explicitly allow any tools needed)
+    /// - All built-in tools disabled (caller must explicitly enable via [`tools`](Self::tools))
     ///
     /// Suitable for CI pipelines, scripts, and automation. Caller must set
     /// [`prompt`](Self::prompt) before building.
@@ -338,7 +350,7 @@ impl CliBuilder {
             strict_mcp_config: true,
             max_turns: Some(1),
             no_session_persistence: true,
-            allowed_tools: Vec::new(),
+            tools: Some(String::new()), // Empty string → --tools "" disables all built-in tools
             ..Self::default()
         }
     }
@@ -445,36 +457,37 @@ impl CliBuilder {
         self
     }
 
-    /// Adds an allowed tool.
-    pub fn allow_tool(mut self, tool: impl Into<String>) -> Self {
-        self.allowed_tools.push(tool.into());
-        self
-    }
-
-    /// Sets all allowed tools.
+    /// Sets allowed tools.
     ///
     /// Filters which tools are permitted from the available set. Use `"Bash(git:*) Edit"` syntax
     /// to allow specific patterns.
-    pub fn allowed_tools<I, T>(mut self, tools: I) -> Self
+    ///
+    /// - `Some([])` — no tools allowed
+    /// - `Some(["Read", "Bash(git:*)"])` — only specified tools allowed
+    /// - `None` — use default (all available tools allowed)
+    pub fn allowed_tools<I, T>(mut self, tools: Option<I>) -> Self
     where
         I: IntoIterator<Item = T>,
-        T: Into<String>,
+        T: AsRef<str>,
     {
-        self.allowed_tools = tools.into_iter().map(Into::into).collect();
+        self.allowed_tools = tools.map(|t| join_args(t));
         self
     }
 
     /// Sets the available built-in tools.
     ///
-    /// Use `""` to disable all tools, `"default"` for all tools, or specify tool names
-    /// (e.g., `"Bash,Edit,Read"`). Different from [`allowed_tools`](Self::allowed_tools) which
-    /// filters on top of available tools.
-    pub fn tools<I, T>(mut self, tools: I) -> Self
+    /// - `Some([])` — disable all tools
+    /// - `Some(["Read", "Bash"])` — only specified tools available
+    /// - `None` — use default tool set
+    ///
+    /// Different from [`allowed_tools`](Self::allowed_tools) which filters on top of available
+    /// tools.
+    pub fn tools<I, T>(mut self, tools: Option<I>) -> Self
     where
         I: IntoIterator<Item = T>,
-        T: Into<String>,
+        T: AsRef<str>,
     {
-        self.tools = tools.into_iter().map(Into::into).collect();
+        self.tools = tools.map(|t| join_args(t));
         self
     }
 
@@ -577,12 +590,12 @@ impl CliBuilder {
             cmd.arg("--max-budget-usd").arg(max_budget_usd.to_string());
         }
 
-        if !self.allowed_tools.is_empty() {
-            cmd.arg("--allowedTools").arg(self.allowed_tools.join(","));
+        if let Some(allowed_tools) = &self.allowed_tools {
+            cmd.arg("--allowedTools").arg(allowed_tools);
         }
 
-        if !self.tools.is_empty() {
-            cmd.arg("--tools").arg(self.tools.join(","));
+        if let Some(tools) = &self.tools {
+            cmd.arg("--tools").arg(tools);
         }
 
         for dir in &self.add_dirs {
@@ -635,8 +648,9 @@ mod tests {
         assert!(args.contains(&"--max-turns"));
         assert!(args.contains(&"1"));
         assert!(args.contains(&"--no-session-persistence"));
-        // No --allowedTools since list is empty
-        assert!(!args.contains(&"--allowedTools"));
+        // --tools "" disables all built-in tools
+        assert!(args.contains(&"--tools"));
+        assert!(args.contains(&""));
     }
 
     #[test]
@@ -675,7 +689,7 @@ mod tests {
             .print(true)
             .output_format(OutputFormat::StreamJson)
             .max_turns(5)
-            .allow_tool("Read")
+            .allowed_tools(Some(["Read"]))
             .build();
 
         let args: Vec<_> = cmd.get_args().map(|s| s.to_str().unwrap()).collect();
