@@ -283,18 +283,30 @@ pub struct CliBuilder {
     verbose: bool,
     /// Initial prompt (for non-interactive mode).
     prompt: Option<String>,
-    /// System prompt.
+    /// System prompt (replaces default).
     system_prompt: Option<String>,
+    /// System prompt to append to default.
+    append_system_prompt: Option<String>,
     /// Model to use.
     model: Option<String>,
+    /// Fallback model when primary is overloaded.
+    fallback_model: Option<String>,
     /// Maximum agentic turns.
     max_turns: Option<u32>,
-    /// Allowed tools (comma-separated list).
+    /// Maximum budget in USD.
+    max_budget_usd: Option<f64>,
+    /// Allowed tools (filter on top of available tools).
     allowed_tools: Vec<String>,
+    /// Available built-in tools.
+    tools: Vec<String>,
     /// Additional directories to allow tool access.
     add_dirs: Vec<PathBuf>,
     /// Print mode (non-interactive).
     print: bool,
+    /// Include partial message chunks in streaming output.
+    include_partial_messages: bool,
+    /// Disable session persistence (ephemeral session).
+    no_session_persistence: bool,
 }
 
 impl CliBuilder {
@@ -312,6 +324,7 @@ impl CliBuilder {
     /// - [`verbose`](Self::verbose) enabled (required for `StreamJson`)
     /// - [`strict_mcp_config`](Self::strict_mcp_config) to ignore external MCP servers
     /// - [`max_turns`](Self::max_turns) set to 1 (single response, no agentic loops)
+    /// - [`no_session_persistence`](Self::no_session_persistence) to avoid writing session files
     /// - No allowed tools (caller must explicitly allow any tools needed)
     ///
     /// Suitable for CI pipelines, scripts, and automation. Caller must set
@@ -324,6 +337,7 @@ impl CliBuilder {
             verbose: true,
             strict_mcp_config: true,
             max_turns: Some(1),
+            no_session_persistence: true,
             allowed_tools: Vec::new(),
             ..Self::default()
         }
@@ -391,9 +405,15 @@ impl CliBuilder {
         self
     }
 
-    /// Sets the system prompt.
+    /// Sets the system prompt (replaces default).
     pub fn system_prompt(mut self, prompt: impl Into<String>) -> Self {
         self.system_prompt = Some(prompt.into());
+        self
+    }
+
+    /// Appends to the default system prompt.
+    pub fn append_system_prompt(mut self, prompt: impl Into<String>) -> Self {
+        self.append_system_prompt = Some(prompt.into());
         self
     }
 
@@ -403,9 +423,25 @@ impl CliBuilder {
         self
     }
 
+    /// Sets the fallback model when primary is overloaded.
+    ///
+    /// Only works with [`print`](Self::print) mode.
+    pub fn fallback_model(mut self, model: impl Into<String>) -> Self {
+        self.fallback_model = Some(model.into());
+        self
+    }
+
     /// Sets the maximum number of agentic turns.
     pub fn max_turns(mut self, turns: u32) -> Self {
         self.max_turns = Some(turns);
+        self
+    }
+
+    /// Sets the maximum budget in USD.
+    ///
+    /// Only works with [`print`](Self::print) mode.
+    pub fn max_budget_usd(mut self, amount: f64) -> Self {
+        self.max_budget_usd = Some(amount);
         self
     }
 
@@ -416,12 +452,29 @@ impl CliBuilder {
     }
 
     /// Sets all allowed tools.
+    ///
+    /// Filters which tools are permitted from the available set. Use `"Bash(git:*) Edit"` syntax
+    /// to allow specific patterns.
     pub fn allowed_tools<I, T>(mut self, tools: I) -> Self
     where
         I: IntoIterator<Item = T>,
         T: Into<String>,
     {
         self.allowed_tools = tools.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Sets the available built-in tools.
+    ///
+    /// Use `""` to disable all tools, `"default"` for all tools, or specify tool names
+    /// (e.g., `"Bash,Edit,Read"`). Different from [`allowed_tools`](Self::allowed_tools) which
+    /// filters on top of available tools.
+    pub fn tools<I, T>(mut self, tools: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        self.tools = tools.into_iter().map(Into::into).collect();
         self
     }
 
@@ -434,6 +487,23 @@ impl CliBuilder {
     /// Enables print mode (non-interactive, outputs result and exits).
     pub fn print(mut self, enabled: bool) -> Self {
         self.print = enabled;
+        self
+    }
+
+    /// Includes partial message chunks in streaming output.
+    ///
+    /// Only works with [`print`](Self::print) and [`OutputFormat::StreamJson`].
+    pub fn include_partial_messages(mut self, enabled: bool) -> Self {
+        self.include_partial_messages = enabled;
+        self
+    }
+
+    /// Disables session persistence (ephemeral session).
+    ///
+    /// Sessions will not be saved to disk and cannot be resumed.
+    /// Only works with [`print`](Self::print) mode.
+    pub fn no_session_persistence(mut self, enabled: bool) -> Self {
+        self.no_session_persistence = enabled;
         self
     }
 
@@ -487,16 +557,32 @@ impl CliBuilder {
             cmd.arg("--system-prompt").arg(system_prompt);
         }
 
+        if let Some(append_system_prompt) = &self.append_system_prompt {
+            cmd.arg("--append-system-prompt").arg(append_system_prompt);
+        }
+
         if let Some(model) = &self.model {
             cmd.arg("--model").arg(model);
+        }
+
+        if let Some(fallback_model) = &self.fallback_model {
+            cmd.arg("--fallback-model").arg(fallback_model);
         }
 
         if let Some(max_turns) = self.max_turns {
             cmd.arg("--max-turns").arg(max_turns.to_string());
         }
 
+        if let Some(max_budget_usd) = self.max_budget_usd {
+            cmd.arg("--max-budget-usd").arg(max_budget_usd.to_string());
+        }
+
         if !self.allowed_tools.is_empty() {
             cmd.arg("--allowedTools").arg(self.allowed_tools.join(","));
+        }
+
+        if !self.tools.is_empty() {
+            cmd.arg("--tools").arg(self.tools.join(","));
         }
 
         for dir in &self.add_dirs {
@@ -505,6 +591,14 @@ impl CliBuilder {
 
         if self.print {
             cmd.arg("-p");
+        }
+
+        if self.include_partial_messages {
+            cmd.arg("--include-partial-messages");
+        }
+
+        if self.no_session_persistence {
+            cmd.arg("--no-session-persistence");
         }
 
         // Prompt is a positional argument, must come last
@@ -540,6 +634,7 @@ mod tests {
         assert!(args.contains(&"--strict-mcp-config"));
         assert!(args.contains(&"--max-turns"));
         assert!(args.contains(&"1"));
+        assert!(args.contains(&"--no-session-persistence"));
         // No --allowedTools since list is empty
         assert!(!args.contains(&"--allowedTools"));
     }
