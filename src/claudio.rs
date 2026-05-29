@@ -1,12 +1,10 @@
-//! Claude Code CLI wrapper.
+//! CLI wrapper for spawning the `claude` command.
 //!
-//! Provides a builder for constructing [`std::process::Command`] instances to spawn the `claude`
-//! CLI. The builder configures command-line arguments for session management, permissions, MCP
-//! servers, and I/O formats.
+//! Provides a builder for constructing [`std::process::Command`] instances. The builder
+//! configures command-line arguments for session management, permissions, MCP servers, and I/O
+//! formats.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::process::Command;
+use std::{collections::HashMap, path::PathBuf, process::Command};
 
 /// Permission mode for tool execution.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -101,11 +99,11 @@ impl McpServer {
         }
     }
 
-    /// Serializes the server definition to JSON for `--mcp-config`.
-    fn to_json(&self) -> String {
+    /// Returns the server definition as a JSON value for `--mcp-config`.
+    fn to_value(&self) -> serde_json::Value {
         match self {
-            McpServer::Stdio(s) => s.to_json(),
-            McpServer::Http(h) => h.to_json(),
+            McpServer::Stdio(s) => s.to_value(),
+            McpServer::Http(h) => h.to_value(),
         }
     }
 }
@@ -168,8 +166,8 @@ impl StdioMcpServer {
         self
     }
 
-    /// Serializes the server definition to JSON.
-    fn to_json(&self) -> String {
+    /// Returns the server definition as a JSON value.
+    fn to_value(&self) -> serde_json::Value {
         let mut obj = serde_json::json!({
             "command": self.command
         });
@@ -179,7 +177,7 @@ impl StdioMcpServer {
         if !self.env.is_empty() {
             obj["env"] = serde_json::json!(self.env);
         }
-        obj.to_string()
+        obj
     }
 }
 
@@ -210,8 +208,8 @@ impl HttpMcpServer {
         self
     }
 
-    /// Serializes the server definition to JSON.
-    fn to_json(&self) -> String {
+    /// Returns the server definition as a JSON value.
+    fn to_value(&self) -> serde_json::Value {
         let mut obj = serde_json::json!({
             "type": "http",
             "url": self.url
@@ -219,13 +217,13 @@ impl HttpMcpServer {
         if !self.headers.is_empty() {
             obj["headers"] = serde_json::json!(self.headers);
         }
-        obj.to_string()
+        obj
     }
 }
 
 /// Builder for constructing a `claude` CLI command.
 #[derive(Clone, Debug, Default)]
-pub struct ClaudeCodeBuilder {
+pub struct CliBuilder {
     /// Working directory for the process.
     workdir: Option<PathBuf>,
     /// Session ID for the conversation.
@@ -262,7 +260,7 @@ pub struct ClaudeCodeBuilder {
     dangerously_skip_permissions: bool,
 }
 
-impl ClaudeCodeBuilder {
+impl CliBuilder {
     /// Creates a new builder with default settings.
     pub fn new() -> Self {
         Self::default()
@@ -409,12 +407,12 @@ impl ClaudeCodeBuilder {
         }
 
         for server in &self.mcp_servers {
-            let config = format!(
-                r#"{{"mcpServers":{{"{}":{}}}}}"#,
-                server.name(),
-                server.to_json()
-            );
-            cmd.arg("--mcp-config").arg(config);
+            let config = serde_json::json!({
+                "mcpServers": {
+                    server.name(): server.to_value()
+                }
+            });
+            cmd.arg("--mcp-config").arg(config.to_string());
         }
 
         if self.strict_mcp_config {
@@ -472,22 +470,18 @@ impl ClaudeCodeBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::ClaudeCodeBuilder;
-    use super::InputFormat;
-    use super::OutputFormat;
-    use super::PermissionMode;
-    use super::StdioMcpServer;
+    use super::{CliBuilder, InputFormat, OutputFormat, PermissionMode, StdioMcpServer};
 
     #[test]
     fn minimal_command() {
-        let cmd = ClaudeCodeBuilder::new().build();
+        let cmd = CliBuilder::new().build();
         let args: Vec<_> = cmd.get_args().collect();
         assert!(args.is_empty());
     }
 
     #[test]
     fn interactive_session_command() {
-        let cmd = ClaudeCodeBuilder::new()
+        let cmd = CliBuilder::new()
             .verbose(true)
             .input_format(InputFormat::StreamJson)
             .output_format(OutputFormat::StreamJson)
@@ -507,7 +501,7 @@ mod tests {
 
     #[test]
     fn one_shot_command() {
-        let cmd = ClaudeCodeBuilder::new()
+        let cmd = CliBuilder::new()
             .prompt("Hello, world!")
             .print(true)
             .output_format(OutputFormat::StreamJson)
@@ -527,7 +521,7 @@ mod tests {
 
     #[test]
     fn mcp_server_config() {
-        let cmd = ClaudeCodeBuilder::new()
+        let cmd = CliBuilder::new()
             .mcp_server(
                 StdioMcpServer::new("myserver", "mycmd")
                     .arg("--flag")
@@ -540,7 +534,10 @@ mod tests {
         assert!(args.contains(&"--mcp-config"));
         assert!(args.contains(&"--strict-mcp-config"));
 
-        let config_idx = args.iter().position(|&a| a == "--mcp-config").unwrap();
+        let config_idx = args
+            .iter()
+            .position(|&a| a == "--mcp-config")
+            .expect("--mcp-config should be present");
         let config = args[config_idx + 1];
         assert!(config.contains("myserver"));
         assert!(config.contains("mycmd"));
