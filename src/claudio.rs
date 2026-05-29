@@ -313,8 +313,9 @@ impl CliBuilder {
 
     /// Sets the session ID for the conversation.
     ///
-    /// Use the same session ID to continue a previous conversation. Sessions are stored in
-    /// `~/.claude/projects/<encoded-path>/<session-id>.jsonl`.
+    /// Can be used both to resume a previous session or to predetermine the ID for a new session.
+    /// Useful for generating deterministic session IDs (e.g., `Uuid::new_v3` from a room/channel
+    /// identifier). Sessions are stored in `~/.claude/projects/<encoded-path>/<session-id>.jsonl`.
     #[cfg(feature = "uuid")]
     pub fn session_id(mut self, id: impl Into<uuid::Uuid>) -> Self {
         self.session_id = Some(id.into());
