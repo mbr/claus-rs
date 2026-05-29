@@ -5,6 +5,7 @@ pub use im;
 pub use schemars;
 
 pub mod anthropic;
+pub mod claudio;
 pub mod conversation;
 pub mod http_request;
 
