@@ -105,9 +105,8 @@ pub enum InputFormat {
     Text,
     /// Newline-delimited JSON stream on stdin.
     ///
-    /// Enables bidirectional communication for interactive sessions. Send messages as
-    /// `{"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "..."}]}}`
-    /// followed by a newline. Pair with [`OutputFormat::StreamJson`] for full duplex messaging.
+    /// Enables bidirectional communication for interactive sessions.
+    // TODO: Explain how to use input format.
     StreamJson,
 }
 
@@ -163,7 +162,7 @@ impl From<HttpMcpServer> for McpServer {
 /// Stdio-based MCP server configuration.
 #[derive(Clone, Debug)]
 pub struct StdioMcpServer {
-    /// Server name (key in mcpServers object).
+    /// Server name (key in `mcpServers` object).
     name: String,
     /// Command to execute.
     command: String,
@@ -267,7 +266,8 @@ pub struct CliBuilder {
     /// Working directory for the process.
     workdir: Option<PathBuf>,
     /// Session ID for the conversation.
-    session_id: Option<String>,
+    #[cfg(feature = "uuid")]
+    session_id: Option<uuid::Uuid>,
     /// MCP servers to configure.
     mcp_servers: Vec<McpServer>,
     /// Whether to ignore MCP servers from other sources.
@@ -311,7 +311,11 @@ impl CliBuilder {
     }
 
     /// Sets the session ID for the conversation.
-    pub fn session_id(mut self, id: impl Into<String>) -> Self {
+    ///
+    /// Use the same session ID to continue a previous conversation. Sessions are stored in
+    /// `~/.claude/projects/<encoded-path>/<session-id>.jsonl`.
+    #[cfg(feature = "uuid")]
+    pub fn session_id(mut self, id: impl Into<uuid::Uuid>) -> Self {
         self.session_id = Some(id.into());
         self
     }
@@ -432,8 +436,9 @@ impl CliBuilder {
             cmd.arg("--output-format").arg(self.output_format.as_str());
         }
 
+        #[cfg(feature = "uuid")]
         if let Some(session_id) = &self.session_id {
-            cmd.arg("--session-id").arg(session_id);
+            cmd.arg("--session-id").arg(session_id.to_string());
         }
 
         for server in &self.mcp_servers {
@@ -512,7 +517,6 @@ mod tests {
             .verbose(true)
             .input_format(InputFormat::StreamJson)
             .output_format(OutputFormat::StreamJson)
-            .session_id("test-session")
             .permission_mode(PermissionMode::DontAsk)
             .build();
 
@@ -520,10 +524,20 @@ mod tests {
         assert!(args.contains(&"--verbose"));
         assert!(args.contains(&"--input-format"));
         assert!(args.contains(&"stream-json"));
-        assert!(args.contains(&"--session-id"));
-        assert!(args.contains(&"test-session"));
         assert!(args.contains(&"--permission-mode"));
         assert!(args.contains(&"dontAsk"));
+    }
+
+    #[test]
+    #[cfg(feature = "uuid")]
+    fn session_id_requires_uuid() {
+        let session_id =
+            uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("valid uuid");
+        let cmd = CliBuilder::new().session_id(session_id).build();
+
+        let args: Vec<_> = cmd.get_args().map(|s| s.to_str().unwrap()).collect();
+        assert!(args.contains(&"--session-id"));
+        assert!(args.contains(&"550e8400-e29b-41d4-a716-446655440000"));
     }
 
     #[test]
