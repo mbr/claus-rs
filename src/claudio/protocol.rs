@@ -18,6 +18,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::anthropic::{Content, Message, ServerToolUsage, StreamEvent, StreamingMessage};
 
+/// Common envelope fields for Claude Code messages.
+///
+/// Most message types include session metadata. Use `#[serde(flatten)]` to embed these fields.
+#[derive(Clone, Debug, Deserialize)]
+pub struct Envelope {
+    /// Session identifier.
+    pub session_id: String,
+    /// Parent tool use ID if this message is part of a tool execution.
+    #[serde(default)]
+    pub parent_tool_use_id: Option<String>,
+    /// Message UUID.
+    pub uuid: String,
+}
+
 /// Message from Claude Code stdout.
 ///
 /// Each line of stdout is a JSON object representing a message, with a
@@ -97,12 +111,9 @@ pub struct McpServerStatus {
 pub struct StreamEventMessage {
     /// The Anthropic streaming event.
     pub event: StreamEvent,
-    /// Session identifier.
-    pub session_id: String,
-    /// Parent tool use ID if this is part of a tool execution.
-    pub parent_tool_use_id: Option<String>,
-    /// Message UUID.
-    pub uuid: String,
+    /// Session metadata.
+    #[serde(flatten)]
+    pub envelope: Envelope,
 }
 
 /// Complete assistant message.
@@ -113,12 +124,9 @@ pub struct StreamEventMessage {
 pub struct AssistantMessage {
     /// The complete Anthropic message.
     pub message: StreamingMessage,
-    /// Session identifier.
-    pub session_id: String,
-    /// Parent tool use ID if this is part of a tool execution.
-    pub parent_tool_use_id: Option<String>,
-    /// Message UUID.
-    pub uuid: String,
+    /// Session metadata.
+    #[serde(flatten)]
+    pub envelope: Envelope,
 }
 
 /// Echoed user message or tool result.
@@ -126,12 +134,9 @@ pub struct AssistantMessage {
 pub struct UserMessage {
     /// The user message content.
     pub message: Message,
-    /// Session identifier.
-    pub session_id: String,
-    /// Parent tool use ID if this is a tool result.
-    pub parent_tool_use_id: Option<String>,
-    /// Message UUID.
-    pub uuid: String,
+    /// Session metadata.
+    #[serde(flatten)]
+    pub envelope: Envelope,
     /// Structured metadata about tool result (present when message contains a tool result).
     #[serde(default)]
     pub tool_use_result: Option<serde_json::Value>,
@@ -360,7 +365,7 @@ mod tests {
             OutputMessage::Assistant(asst) => {
                 assert_eq!(asst.message.id, "msg_016erzjGS5oTB6Q8uohJEpAs");
                 assert_eq!(asst.message.content.len(), 1);
-                assert!(asst.parent_tool_use_id.is_none());
+                assert!(asst.envelope.parent_tool_use_id.is_none());
             }
             _ => panic!("expected Assistant variant"),
         }
