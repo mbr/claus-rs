@@ -14,9 +14,65 @@
 //! - `user` — Echoed user messages or tool results
 //! - `result` — Final result with statistics (cost, duration, token usage)
 
+use std::io::{self, BufRead};
+
 use serde::{Deserialize, Serialize};
 
 use crate::anthropic::{Content, Message, Role, ServerToolUsage, StreamEvent, StreamingMessage};
+
+/// Error parsing Claude Code output.
+#[derive(Debug, thiserror::Error)]
+pub enum ParseError {
+    /// Failed to read a line.
+    #[error("failed to read line")]
+    Io(#[from] io::Error),
+    /// Failed to parse JSON.
+    #[error("failed to parse JSON: {line:?}")]
+    Json {
+        /// The line that failed to parse.
+        line: String,
+        /// The parse error.
+        #[source]
+        source: serde_json::Error,
+    },
+}
+
+/// Parses lines of Claude Code stdout into messages.
+///
+/// Takes any [`BufRead`] (e.g., from [`std::process::Output::stdout`]) and returns an iterator
+/// yielding parsed [`OutputMessage`]s. Empty lines are skipped.
+///
+/// # Example
+///
+/// ```no_run
+/// use claus::claudio::{CliBuilder, protocol::{parse_output, OutputMessage}};
+///
+/// let output = CliBuilder::headless()
+///     .prompt("Hello")
+///     .build()
+///     .output()
+///     .expect("failed to run");
+///
+/// for msg in parse_output(&output.stdout[..]) {
+///     match msg {
+///         Ok(OutputMessage::Assistant(a)) => println!("Assistant: {:?}", a.message.content),
+///         Ok(OutputMessage::Result(r)) => println!("Done: ${:.4}", r.total_cost_usd),
+///         Ok(_) => {}
+///         Err(e) => eprintln!("Error: {e}"),
+///     }
+/// }
+/// ```
+pub fn parse_output(
+    reader: impl BufRead,
+) -> impl Iterator<Item = Result<OutputMessage, ParseError>> {
+    reader.lines().filter_map(|line_result| match line_result {
+        Ok(line) if line.is_empty() => None,
+        Ok(line) => {
+            Some(serde_json::from_str(&line).map_err(|source| ParseError::Json { line, source }))
+        }
+        Err(e) => Some(Err(ParseError::Io(e))),
+    })
+}
 
 /// Common envelope fields for Claude Code messages.
 ///
