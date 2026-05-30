@@ -108,7 +108,7 @@ pub fn parse_output(output: &std::process::Output) -> Result<Vec<OutputMessage>,
     let messages: Vec<OutputMessage> = stdout
         .lines()
         .filter(|line| !line.is_empty())
-        .map(|line| serde_json::from_str(line))
+        .map(serde_json::from_str)
         .collect::<Result<_, _>>()?;
 
     match messages.last() {
