@@ -1,18 +1,12 @@
 # claus
 
-claus is a client crate for [Anthropic's API](https://www.anthropic.com/api), which is often known only as "the Claude
-API". It allows having "conversations" with a hosted version of the latest
-Claude [large language models](https://en.wikipedia.org/wiki/Large_language_model).
+claus is a client crate for [Anthropic's API](https://www.anthropic.com/api), which is often known only as "the Claude API". It allows having "conversations" with a hosted version of the latest Claude [large language models](https://en.wikipedia.org/wiki/Large_language_model).
 
 claus is set apart by a few features from many other implementations:
 
-* **Layered**: Direct access to API "primitives" is possible; all functionality is built on top of a set of data types
-  covering a large portion of the API.
-* **I/O-less**: claus itself does not perform any I/O, i.e., it does not make any HTTP requests and all of its methods
-  are pure functions. This makes it HTTP client framework agnostic by default, although it contains convenience
-  functions for some.
-* **Efficient**: Uses data structures from the [`im`] crate for efficient sharing and cloning of conversation history
-  without deep copying.
+* **Layered**: Direct access to API "primitives" is possible; all functionality is built on top of a set of data types covering a large portion of the API.
+* **I/O-less**: claus itself does not perform any I/O, i.e., it does not make any HTTP requests and all of its methods are pure functions. This makes it HTTP client framework agnostic by default, although it contains convenience functions for some.
+* **Efficient**: Uses data structures from the [`im`] crate for efficient sharing and cloning of conversation history without deep copying.
 
 ## Assistant example
 
@@ -58,8 +52,7 @@ assert_eq!(
 // now the request can be sent with any HTTP client
 ```
 
-This produces [`http_request::HttpRequest`]s that need to be sent using a suitable HTTP client
-framework, see the module for details.
+This produces [`http_request::HttpRequest`]s that need to be sent using a suitable HTTP client framework, see the module for details.
 
 Calling the Anthropic API means sending the entire conversation every time a request is made, i.e., you are responsible for attaching all responses to the set of messages (that includes the user's) every time a request is made. See [`examples/simple_chat.rs`](examples/simple_chat.rs) for a complete example.
 
