@@ -676,6 +676,7 @@ pub enum Delta {
 ///     model: "claude-test".to_string(),
 ///     stop_reason: None,
 ///     stop_sequence: None,
+///     stop_details: None,
 ///     usage: Usage {
 ///         input_tokens: 10,
 ///         output_tokens: 5,
@@ -684,6 +685,7 @@ pub enum Delta {
 ///     },
 ///     role: Role::Assistant,
 ///     content: vec![],
+///     context_management: None,
 /// };
 ///
 /// let delta = MessageDelta {
