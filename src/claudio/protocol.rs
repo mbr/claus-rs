@@ -14,38 +14,19 @@
 //! - `user` — Echoed user messages or tool results
 //! - `result` — Final result with statistics (cost, duration, token usage)
 
-use std::io::{self, BufRead};
-
 use serde::{Deserialize, Serialize};
 
 use crate::anthropic::{Content, Message, Role, ServerToolUsage, StreamEvent, StreamingMessage};
 
-/// Error parsing Claude Code output.
-#[derive(Debug, thiserror::Error)]
-pub enum ParseError {
-    /// Failed to read a line.
-    #[error("failed to read line")]
-    Io(#[from] io::Error),
-    /// Failed to parse JSON.
-    #[error("failed to parse JSON: {line:?}")]
-    Json {
-        /// The line that failed to parse.
-        line: String,
-        /// The parse error.
-        #[source]
-        source: serde_json::Error,
-    },
-}
-
-/// Parses lines of Claude Code stdout into messages.
+/// Parses a single line of Claude Code output.
 ///
-/// Takes any [`BufRead`] (e.g., from [`std::process::Output::stdout`]) and returns an iterator
-/// yielding parsed [`OutputMessage`]s. Empty lines are skipped.
+/// Returns `None` for empty lines, `Some(Ok(...))` for valid messages, or
+/// `Some(Err(...))` for parse errors.
 ///
 /// # Example
 ///
 /// ```no_run
-/// use claus::claudio::{CliBuilder, protocol::{parse_output, OutputMessage}};
+/// use claus::claudio::{CliBuilder, protocol::{parse_line, OutputMessage}};
 ///
 /// let output = CliBuilder::headless()
 ///     .prompt("Hello")
@@ -53,25 +34,26 @@ pub enum ParseError {
 ///     .output()
 ///     .expect("failed to run");
 ///
-/// for msg in parse_output(&output.stdout[..]) {
-///     match msg {
-///         Ok(OutputMessage::Assistant(a)) => println!("Assistant: {:?}", a.message.content),
-///         Ok(OutputMessage::Result(r)) => println!("Done: ${:.4}", r.total_cost_usd),
-///         Ok(_) => {}
-///         Err(e) => eprintln!("Error: {e}"),
+/// let stdout = String::from_utf8_lossy(&output.stdout);
+/// for line in stdout.lines() {
+///     match parse_line(line) {
+///         Some(Ok(OutputMessage::Assistant(a))) => {
+///             println!("Assistant: {:?}", a.message.content);
+///         }
+///         Some(Ok(OutputMessage::Result(r))) => {
+///             println!("Done: ${:.4}", r.total_cost_usd);
+///         }
+///         Some(Ok(_)) => {}
+///         Some(Err(e)) => eprintln!("Parse error: {e}"),
+///         None => {}
 ///     }
 /// }
 /// ```
-pub fn parse_output(
-    reader: impl BufRead,
-) -> impl Iterator<Item = Result<OutputMessage, ParseError>> {
-    reader.lines().filter_map(|line_result| match line_result {
-        Ok(line) if line.is_empty() => None,
-        Ok(line) => {
-            Some(serde_json::from_str(&line).map_err(|source| ParseError::Json { line, source }))
-        }
-        Err(e) => Some(Err(ParseError::Io(e))),
-    })
+pub fn parse_line(line: &str) -> Option<Result<OutputMessage, serde_json::Error>> {
+    if line.is_empty() {
+        return None;
+    }
+    Some(serde_json::from_str(line))
 }
 
 /// Common envelope fields for Claude Code messages.

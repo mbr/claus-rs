@@ -321,6 +321,8 @@ pub struct CliBuilder {
     include_partial_messages: bool,
     /// Disable session persistence (ephemeral session).
     no_session_persistence: bool,
+    /// Working directory for the process.
+    current_dir: Option<PathBuf>,
 }
 
 impl CliBuilder {
@@ -512,6 +514,12 @@ impl CliBuilder {
         self
     }
 
+    /// Sets the working directory for the process.
+    pub fn current_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.current_dir = Some(dir.into());
+        self
+    }
+
     /// Enables print mode (non-interactive, outputs result and exits).
     pub fn print(mut self, enabled: bool) -> Self {
         self.print = enabled;
@@ -632,6 +640,10 @@ impl CliBuilder {
         // Prompt is a positional argument, must come last
         if let Some(prompt) = &self.prompt {
             cmd.arg(prompt);
+        }
+
+        if let Some(dir) = &self.current_dir {
+            cmd.current_dir(dir);
         }
 
         cmd
