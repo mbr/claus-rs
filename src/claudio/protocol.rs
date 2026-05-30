@@ -14,19 +14,43 @@
 //! - `user` — Echoed user messages or tool results
 //! - `result` — Final result with statistics (cost, duration, token usage)
 
+use std::process::ExitStatus;
+
 use serde::{Deserialize, Serialize};
 
 use crate::anthropic::{Content, Message, Role, ServerToolUsage, StreamEvent, StreamingMessage};
+
+/// Error from running Claude Code.
+#[derive(Debug, thiserror::Error)]
+#[error("claude exited with {status}")]
+pub struct RunError {
+    /// Process exit status.
+    pub status: ExitStatus,
+    /// Captured stderr.
+    pub stderr: String,
+}
 
 /// Parses a single line of Claude Code output.
 ///
 /// Returns `None` for empty lines, `Some(Ok(...))` for valid messages, or
 /// `Some(Err(...))` for parse errors.
+pub fn parse_line(line: &str) -> Option<Result<OutputMessage, serde_json::Error>> {
+    if line.is_empty() {
+        return None;
+    }
+    Some(serde_json::from_str(line))
+}
+
+/// Parses Claude Code process output.
+///
+/// Returns an error if the process exited with non-zero status. Otherwise,
+/// parses all lines from stdout, skipping empty lines. Works with both
+/// `std::process::Output` and `tokio::process::Output` (they're the same type).
 ///
 /// # Example
 ///
 /// ```no_run
-/// use claus::claudio::{CliBuilder, protocol::{parse_line, OutputMessage}};
+/// use claus::claudio::{CliBuilder, protocol::{parse_output, OutputMessage}};
 ///
 /// let output = CliBuilder::headless()
 ///     .prompt("Hello")
@@ -34,26 +58,30 @@ use crate::anthropic::{Content, Message, Role, ServerToolUsage, StreamEvent, Str
 ///     .output()
 ///     .expect("failed to run");
 ///
-/// let stdout = String::from_utf8_lossy(&output.stdout);
-/// for line in stdout.lines() {
-///     match parse_line(line) {
-///         Some(Ok(OutputMessage::Assistant(a))) => {
+/// for msg in parse_output(&output).expect("claude failed") {
+///     match msg {
+///         Ok(OutputMessage::Assistant(a)) => {
 ///             println!("Assistant: {:?}", a.message.content);
 ///         }
-///         Some(Ok(OutputMessage::Result(r))) => {
+///         Ok(OutputMessage::Result(r)) => {
 ///             println!("Done: ${:.4}", r.total_cost_usd);
 ///         }
-///         Some(Ok(_)) => {}
-///         Some(Err(e)) => eprintln!("Parse error: {e}"),
-///         None => {}
+///         Ok(_) => {}
+///         Err(e) => eprintln!("Parse error: {e}"),
 ///     }
 /// }
 /// ```
-pub fn parse_line(line: &str) -> Option<Result<OutputMessage, serde_json::Error>> {
-    if line.is_empty() {
-        return None;
+pub fn parse_output(
+    output: &std::process::Output,
+) -> Result<Vec<Result<OutputMessage, serde_json::Error>>, RunError> {
+    if !output.status.success() {
+        return Err(RunError {
+            status: output.status,
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
     }
-    Some(serde_json::from_str(line))
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.lines().filter_map(parse_line).collect())
 }
 
 /// Common envelope fields for Claude Code messages.
