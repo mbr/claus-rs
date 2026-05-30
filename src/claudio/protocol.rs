@@ -22,12 +22,33 @@ use crate::anthropic::{Content, Message, Role, ServerToolUsage, StreamEvent, Str
 
 /// Error from running Claude Code.
 #[derive(Debug, thiserror::Error)]
-#[error("claude exited with {status}")]
-pub struct RunError {
-    /// Process exit status.
-    pub status: ExitStatus,
-    /// Captured stderr.
-    pub stderr: String,
+pub enum RunError {
+    /// Process exited with non-zero status.
+    #[error("process exited with {status}")]
+    ProcessFailed {
+        /// Process exit status.
+        status: ExitStatus,
+        /// Captured stderr.
+        stderr: String,
+    },
+    /// No output messages received.
+    #[error("no output messages")]
+    NoMessages,
+    /// Final message was not a result.
+    #[error("final message was not a result")]
+    MissingResult,
+    /// Claude reported an error in the result.
+    #[error("claude error: {}", .messages.last().and_then(|m| match m {
+        OutputMessage::Result(r) => r.result.as_deref(),
+        _ => None,
+    }).unwrap_or("unknown"))]
+    ResultError {
+        /// All messages including the error result.
+        messages: Vec<OutputMessage>,
+    },
+    /// Failed to parse a message.
+    #[error("failed to parse message")]
+    Parse(#[from] serde_json::Error),
 }
 
 /// Parses a single line of Claude Code output.
@@ -43,9 +64,14 @@ pub fn parse_line(line: &str) -> Option<Result<OutputMessage, serde_json::Error>
 
 /// Parses Claude Code process output.
 ///
-/// Returns an error if the process exited with non-zero status. Otherwise,
-/// parses all lines from stdout, skipping empty lines. Works with both
-/// `std::process::Output` and `tokio::process::Output` (they're the same type).
+/// Returns an error if:
+/// - The process exited with non-zero status
+/// - No messages were received
+/// - The final message is not a result
+/// - The result indicates an error (`is_error: true`)
+/// - Any message fails to parse
+///
+/// Works with both `std::process::Output` and `tokio::process::Output` (same type).
 ///
 /// # Example
 ///
@@ -60,28 +86,37 @@ pub fn parse_line(line: &str) -> Option<Result<OutputMessage, serde_json::Error>
 ///
 /// for msg in parse_output(&output).expect("claude failed") {
 ///     match msg {
-///         Ok(OutputMessage::Assistant(a)) => {
+///         OutputMessage::Assistant(a) => {
 ///             println!("Assistant: {:?}", a.message.content);
 ///         }
-///         Ok(OutputMessage::Result(r)) => {
+///         OutputMessage::Result(r) => {
 ///             println!("Done: ${:.4}", r.total_cost_usd);
 ///         }
-///         Ok(_) => {}
-///         Err(e) => eprintln!("Parse error: {e}"),
+///         _ => {}
 ///     }
 /// }
 /// ```
-pub fn parse_output(
-    output: &std::process::Output,
-) -> Result<Vec<Result<OutputMessage, serde_json::Error>>, RunError> {
+pub fn parse_output(output: &std::process::Output) -> Result<Vec<OutputMessage>, RunError> {
     if !output.status.success() {
-        return Err(RunError {
+        return Err(RunError::ProcessFailed {
             status: output.status,
             stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
         });
     }
+
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout.lines().filter_map(parse_line).collect())
+    let messages: Vec<OutputMessage> = stdout
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(|line| serde_json::from_str(line))
+        .collect::<Result<_, _>>()?;
+
+    match messages.last() {
+        None => Err(RunError::NoMessages),
+        Some(OutputMessage::Result(r)) if r.is_error => Err(RunError::ResultError { messages }),
+        Some(OutputMessage::Result(_)) => Ok(messages),
+        Some(_) => Err(RunError::MissingResult),
+    }
 }
 
 /// Common envelope fields for Claude Code messages.
