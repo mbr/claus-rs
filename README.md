@@ -89,3 +89,33 @@ for item in action.contents {
 
 The streaming API is supported as well, although not in conversations. See
 [`examples/streaming.rs`](examples/streaming.rs) for a demonstration on how to use it.
+
+## Claude Code CLI Wrapper
+
+The [`claudio`] module provides a builder for spawning the [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI and parsing its output:
+
+```rust,no_run
+use claus::claudio::{CliBuilder, protocol::{parse_output, OutputMessage}};
+
+let output = CliBuilder::headless()
+    .prompt("What is 2 + 2?")
+    .build()
+    .output()
+    .expect("failed to run");
+
+for msg in parse_output(&output).expect("claude failed") {
+    match msg {
+        OutputMessage::Assistant(a) => {
+            for content in &a.message.content {
+                println!("{content}");
+            }
+        }
+        OutputMessage::Result(r) => {
+            println!("Cost: ${:.4}", r.total_cost_usd);
+        }
+        _ => {}
+    }
+}
+```
+
+The `headless()` preset configures non-interactive mode with `--output-format stream-json` for structured output parsing.
