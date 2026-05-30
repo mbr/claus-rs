@@ -49,7 +49,7 @@ fn is_false(value: &bool) -> bool {
 
 /// A role in a conversation.
 ///
-/// The currrent API specification only supports `user` and `assistant` roles.
+/// The current API specification only supports `user` and `assistant` roles.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
@@ -73,7 +73,7 @@ pub struct Message {
 }
 
 impl Message {
-    /// Convenience function to construct a message containt a single piece of text.
+    /// Convenience function to construct a message containing a single piece of text.
     pub fn from_text<S: Into<String>>(role: Role, text: S) -> Self {
         Self {
             role,

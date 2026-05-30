@@ -115,7 +115,7 @@ pub fn tool_web_search(
 
 /// Fetches the content of a web page and converts it to clean text.
 ///
-/// Truncates if the fetched page exceeds [`SENSIBLE_TEXT_LENGTH`] *in bytes*.
+/// Truncates if the fetched page exceeds [`SENSIBLE_TEXT_LENGTH`] in characters.
 pub fn tool_fetch_page(client: &Client, url: &str) -> Result<String, String> {
     let request = Request::new(Method::GET, url.parse().expect("Failed to parse URL"));
     let html = super::send_request(client, request)?;

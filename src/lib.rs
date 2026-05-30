@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 
-/// Make it easier for users to hold shares message histories, if necessary.
+/// Make it easier for users to hold shared message histories, if necessary.
 pub use im;
 pub use schemars;
 
