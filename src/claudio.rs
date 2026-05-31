@@ -278,9 +278,10 @@ impl HttpMcpServer {
 /// Builder for constructing a `claude` CLI command.
 #[derive(Clone, Debug, Default)]
 pub struct CliBuilder {
-    /// Resume a previous session.
-    resume: bool,
-    /// Session ID for the conversation.
+    /// Session ID of a previous session to resume.
+    #[cfg(feature = "uuid")]
+    resume: Option<uuid::Uuid>,
+    /// Session ID for a new conversation.
     #[cfg(feature = "uuid")]
     session_id: Option<uuid::Uuid>,
     /// MCP servers to configure.
@@ -333,12 +334,12 @@ impl CliBuilder {
         Self::default()
     }
 
-    /// Resumes the most recent session.
+    /// Resumes a previous session by ID.
     ///
-    /// Note: Cannot be combined with [`session_id`](Self::session_id) to resume a specific
-    /// session. Use `--session-id` only for new sessions.
-    pub fn resume(mut self, enabled: bool) -> Self {
-        self.resume = enabled;
+    /// Sessions are stored in `~/.claude/projects/<encoded-path>/<session-id>.jsonl`.
+    #[cfg(feature = "uuid")]
+    pub fn resume(mut self, session_id: impl Into<uuid::Uuid>) -> Self {
+        self.resume = Some(session_id.into());
         self
     }
 
@@ -375,9 +376,6 @@ impl CliBuilder {
     /// Predetermines the session ID for new sessions. Useful for generating deterministic IDs
     /// (e.g., `Uuid::new_v5` from a room/channel identifier). Fails if a session with this ID
     /// already exists.
-    ///
-    /// Note: Cannot be combined with [`resume`](Self::resume) to resume a specific session.
-    /// The CLI only supports resuming the most recent session.
     ///
     /// Sessions are stored in `~/.claude/projects/<encoded-path>/<session-id>.jsonl`.
     #[cfg(feature = "uuid")]
@@ -578,8 +576,9 @@ impl CliBuilder {
             cmd.arg("--output-format").arg(self.output_format.as_str());
         }
 
-        if self.resume {
-            cmd.arg("--resume");
+        #[cfg(feature = "uuid")]
+        if let Some(session_id) = &self.resume {
+            cmd.arg("--resume").arg(session_id.to_string());
         }
 
         #[cfg(feature = "uuid")]
