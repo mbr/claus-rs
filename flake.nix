@@ -50,6 +50,17 @@
           cargoLock = {
             lockFile = ./Cargo.lock;
           };
+
+          # Build only the library and the pretty_print example
+          cargoBuildFlags = [
+            "--lib"
+            "--example"
+            "pretty_print"
+          ];
+
+          postInstall = ''
+            install -Dm755 target/*/release/examples/pretty_print $out/bin/claus-pretty-print
+          '';
         };
 
         devShells.default = pkgs.mkShell {
