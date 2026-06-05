@@ -30,6 +30,10 @@ name = "assistant"
 path = "examples/assistant/main.rs"
 required-features = ["reqwest-blocking"]
 
+[[example]]
+name = "pretty_print"
+path = "examples/pretty_print.rs"
+
 [dependencies]
 reqwest = { version = "0.12.19", optional = true }
 uuid = { version = "1", optional = true }
